@@ -58,9 +58,9 @@ class GeminiSessionViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(isGeminiActive = true)
 
         // Wire audio callbacks
-        audioManager.onAudioCaptured = { data ->
+        audioManager.onAudioCaptured = lambda@{ data ->
             // Phone mode: mute mic while model speaks to prevent echo
-            if (streamingMode == StreamingMode.PHONE && geminiService.isModelSpeaking.value) return@onAudioCaptured
+            if (streamingMode == StreamingMode.PHONE && geminiService.isModelSpeaking.value) return@lambda
             geminiService.sendAudio(data)
         }
 
