@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -128,9 +129,9 @@ fun StreamScreen(
         }
 
         // Overlays + controls
-        Box(modifier = Modifier.fillMaxSize().padding(all = 16.dp)) {
-            // Top overlays
-            Column(modifier = Modifier.align(Alignment.TopStart)) {
+        Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+            // Top overlays (below status bar)
+            Column(modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(top = 8.dp)) {
                 // Gemini overlay
                 if (geminiUiState.isGeminiActive) {
                     GeminiOverlay(uiState = geminiUiState)
