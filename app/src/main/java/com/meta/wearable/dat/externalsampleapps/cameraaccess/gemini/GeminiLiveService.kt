@@ -19,6 +19,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -61,6 +62,7 @@ class GeminiLiveService {
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(10, TimeUnit.SECONDS)
         .build()
 
     fun connect(callback: (Boolean) -> Unit) {
@@ -84,6 +86,10 @@ class GeminiLiveService {
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 handleMessage(text)
+            }
+
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                handleMessage(bytes.utf8())
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -220,9 +226,8 @@ class GeminiLiveService {
                 put("outputAudioTranscription", JSONObject())
             })
         }
-        sendExecutor.execute {
-            webSocket?.send(setup.toString())
-        }
+        // Send directly (not via sendExecutor) to ensure it's the first message
+        webSocket?.send(setup.toString())
     }
 
     private fun handleMessage(text: String) {
