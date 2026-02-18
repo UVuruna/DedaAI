@@ -7,6 +7,8 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.GeminiTool
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.GeminiToolCallCancellation
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.ToolDeclarations
 import java.io.ByteArrayOutputStream
+import java.util.Timer
+import java.util.TimerTask
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,6 +57,7 @@ class GeminiLiveService {
     private var webSocket: WebSocket? = null
     private val sendExecutor = Executors.newSingleThreadExecutor()
     private var connectCallback: ((Boolean) -> Unit)? = null
+    private var timeoutTimer: Timer? = null
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -107,18 +110,24 @@ class GeminiLiveService {
             }
         })
 
-        // Timeout after 15 seconds
-        sendExecutor.execute {
-            Thread.sleep(15000)
-            if (_connectionState.value == GeminiConnectionState.Connecting
-                || _connectionState.value == GeminiConnectionState.SettingUp) {
-                _connectionState.value = GeminiConnectionState.Error("Connection timed out")
-                resolveConnect(false)
-            }
+        // Timeout after 15 seconds (use Timer so we don't block sendExecutor)
+        timeoutTimer = Timer().apply {
+            schedule(object : TimerTask() {
+                override fun run() {
+                    if (_connectionState.value == GeminiConnectionState.Connecting
+                        || _connectionState.value == GeminiConnectionState.SettingUp) {
+                        Log.e(TAG, "Connection timed out")
+                        _connectionState.value = GeminiConnectionState.Error("Connection timed out")
+                        resolveConnect(false)
+                    }
+                }
+            }, 15000)
         }
     }
 
     fun disconnect() {
+        timeoutTimer?.cancel()
+        timeoutTimer = null
         webSocket?.close(1000, null)
         webSocket = null
         onToolCall = null
@@ -171,8 +180,11 @@ class GeminiLiveService {
     // Private
 
     private fun resolveConnect(success: Boolean) {
-        connectCallback?.invoke(success)
-        connectCallback = null
+        val cb = connectCallback
+        connectCallback = null  // null out BEFORE invoking to prevent re-entrancy
+        timeoutTimer?.cancel()
+        timeoutTimer = null
+        cb?.invoke(success)
     }
 
     private fun sendSetupMessage() {
