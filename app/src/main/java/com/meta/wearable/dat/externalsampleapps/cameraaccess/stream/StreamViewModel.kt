@@ -76,6 +76,10 @@ class StreamViewModel(
   fun startStream() {
     videoJob?.cancel()
     stateJob?.cancel()
+
+    // Start foreground service to keep streaming alive in background / screen locked
+    StreamingService.start(getApplication())
+
     val streamSession =
         Wearables.startStreamSession(
                 getApplication(),
@@ -123,6 +127,9 @@ class StreamViewModel(
   }
 
   fun stopStream() {
+    // Stop foreground service
+    StreamingService.stop(getApplication())
+
     videoJob?.cancel()
     videoJob = null
     stateJob?.cancel()
