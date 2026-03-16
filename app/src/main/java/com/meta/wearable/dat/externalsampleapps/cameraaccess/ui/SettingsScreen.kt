@@ -13,12 +13,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -47,6 +49,7 @@ fun SettingsScreen(
     var openClawHookToken by remember { mutableStateOf(SettingsManager.openClawHookToken) }
     var openClawGatewayToken by remember { mutableStateOf(SettingsManager.openClawGatewayToken) }
     var webrtcSignalingURL by remember { mutableStateOf(SettingsManager.webrtcSignalingURL) }
+    var videoStreamingEnabled by remember { mutableStateOf(SettingsManager.videoStreamingEnabled) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     fun save() {
@@ -57,6 +60,7 @@ fun SettingsScreen(
         SettingsManager.openClawHookToken = openClawHookToken.trim()
         SettingsManager.openClawGatewayToken = openClawGatewayToken.trim()
         SettingsManager.webrtcSignalingURL = webrtcSignalingURL.trim()
+        SettingsManager.videoStreamingEnabled = videoStreamingEnabled
     }
 
     fun reload() {
@@ -67,6 +71,7 @@ fun SettingsScreen(
         openClawHookToken = SettingsManager.openClawHookToken
         openClawGatewayToken = SettingsManager.openClawGatewayToken
         webrtcSignalingURL = SettingsManager.webrtcSignalingURL
+        videoStreamingEnabled = SettingsManager.videoStreamingEnabled
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -146,6 +151,27 @@ fun SettingsScreen(
                 placeholder = "wss://your-server.example.com",
                 keyboardType = KeyboardType.Uri,
             )
+
+            // Video
+            SectionHeader("Video")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("Video Streaming", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Disable to save battery. Audio remains active.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = videoStreamingEnabled,
+                    onCheckedChange = { videoStreamingEnabled = it },
+                )
+            }
 
             // Reset
             TextButton(onClick = { showResetDialog = true }) {

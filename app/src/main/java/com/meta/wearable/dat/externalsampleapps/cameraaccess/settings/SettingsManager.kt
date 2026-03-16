@@ -44,6 +44,10 @@ object SettingsManager {
         get() = prefs.getString("webrtcSignalingURL", null) ?: Secrets.webrtcSignalingURL
         set(value) = prefs.edit().putString("webrtcSignalingURL", value).apply()
 
+    var videoStreamingEnabled: Boolean
+        get() = prefs.getBoolean("videoStreamingEnabled", true)
+        set(value) = prefs.edit().putBoolean("videoStreamingEnabled", value).apply()
+
     fun resetAll() {
         prefs.edit().clear().apply()
     }

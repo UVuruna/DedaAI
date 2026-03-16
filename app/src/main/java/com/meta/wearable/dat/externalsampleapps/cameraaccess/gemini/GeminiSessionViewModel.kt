@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.OpenClawBridge
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.OpenClawConnectionState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.ToolCallRouter
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.ToolCallStatus
@@ -177,6 +178,7 @@ class GeminiSessionViewModel : ViewModel() {
     }
 
     fun sendVideoFrameIfThrottled(bitmap: Bitmap) {
+        if (!SettingsManager.videoStreamingEnabled) return
         if (!_uiState.value.isGeminiActive) return
         if (_uiState.value.connectionState != GeminiConnectionState.Ready) return
         val now = System.currentTimeMillis()
