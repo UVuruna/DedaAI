@@ -48,6 +48,10 @@ object SettingsManager {
         get() = prefs.getBoolean("videoStreamingEnabled", true)
         set(value) = prefs.edit().putBoolean("videoStreamingEnabled", value).apply()
 
+    var proactiveNotificationsEnabled: Boolean
+        get() = prefs.getBoolean("proactiveNotificationsEnabled", true)
+        set(value) = prefs.edit().putBoolean("proactiveNotificationsEnabled", value).apply()
+
     fun resetAll() {
         prefs.edit().clear().apply()
     }

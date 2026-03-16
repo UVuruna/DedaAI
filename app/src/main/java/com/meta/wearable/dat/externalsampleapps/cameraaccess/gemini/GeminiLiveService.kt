@@ -183,6 +183,23 @@ class GeminiLiveService {
         }
     }
 
+    fun sendTextMessage(text: String) {
+        if (_connectionState.value != GeminiConnectionState.Ready) return
+        sendExecutor.execute {
+            val json = JSONObject().apply {
+                put("clientContent", JSONObject().apply {
+                    put("turns", JSONArray().put(JSONObject().apply {
+                        put("role", "user")
+                        put("parts", JSONArray().put(JSONObject().apply {
+                            put("text", text)
+                        }))
+                    }))
+                })
+            }
+            webSocket?.send(json.toString())
+        }
+    }
+
     // Private
 
     private fun resolveConnect(success: Boolean) {

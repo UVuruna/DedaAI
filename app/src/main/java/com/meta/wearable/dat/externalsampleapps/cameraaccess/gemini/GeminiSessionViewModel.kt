@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.OpenClawBridge
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.OpenClawEventClient
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.OpenClawConnectionState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw.ToolCallRouter
@@ -41,6 +42,7 @@ class GeminiSessionViewModel : ViewModel() {
     private val openClawBridge = OpenClawBridge()
     private var toolCallRouter: ToolCallRouter? = null
     private val audioManager = AudioManager()
+    private val eventClient = OpenClawEventClient()
     private var lastVideoFrameTime: Long = 0
     private var stateObservationJob: Job? = null
 
@@ -163,11 +165,23 @@ class GeminiSessionViewModel : ViewModel() {
                         connectionState = GeminiConnectionState.Disconnected
                     )
                 }
+
+                // Connect to OpenClaw event stream for proactive notifications
+                if (SettingsManager.proactiveNotificationsEnabled) {
+                    eventClient.onNotification = { text ->
+                        val state = _uiState.value
+                        if (state.isGeminiActive && state.connectionState == GeminiConnectionState.Ready) {
+                            geminiService.sendTextMessage(text)
+                        }
+                    }
+                    eventClient.connect()
+                }
             }
         }
     }
 
     fun stopSession() {
+        eventClient.disconnect()
         toolCallRouter?.cancelAll()
         toolCallRouter = null
         audioManager.stopCapture()

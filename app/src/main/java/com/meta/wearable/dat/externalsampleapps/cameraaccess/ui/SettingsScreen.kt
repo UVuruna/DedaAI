@@ -50,6 +50,7 @@ fun SettingsScreen(
     var openClawGatewayToken by remember { mutableStateOf(SettingsManager.openClawGatewayToken) }
     var webrtcSignalingURL by remember { mutableStateOf(SettingsManager.webrtcSignalingURL) }
     var videoStreamingEnabled by remember { mutableStateOf(SettingsManager.videoStreamingEnabled) }
+    var proactiveNotificationsEnabled by remember { mutableStateOf(SettingsManager.proactiveNotificationsEnabled) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     fun save() {
@@ -61,6 +62,7 @@ fun SettingsScreen(
         SettingsManager.openClawGatewayToken = openClawGatewayToken.trim()
         SettingsManager.webrtcSignalingURL = webrtcSignalingURL.trim()
         SettingsManager.videoStreamingEnabled = videoStreamingEnabled
+        SettingsManager.proactiveNotificationsEnabled = proactiveNotificationsEnabled
     }
 
     fun reload() {
@@ -72,6 +74,7 @@ fun SettingsScreen(
         openClawGatewayToken = SettingsManager.openClawGatewayToken
         webrtcSignalingURL = SettingsManager.webrtcSignalingURL
         videoStreamingEnabled = SettingsManager.videoStreamingEnabled
+        proactiveNotificationsEnabled = SettingsManager.proactiveNotificationsEnabled
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -170,6 +173,27 @@ fun SettingsScreen(
                 Switch(
                     checked = videoStreamingEnabled,
                     onCheckedChange = { videoStreamingEnabled = it },
+                )
+            }
+
+            // Notifications
+            SectionHeader("Notifications")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("Proactive Notifications", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Receive updates from OpenClaw spoken through glasses.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = proactiveNotificationsEnabled,
+                    onCheckedChange = { proactiveNotificationsEnabled = it },
                 )
             }
 
