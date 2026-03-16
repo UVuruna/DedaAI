@@ -2,10 +2,6 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.openclaw
 
 import android.util.Log
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiConfig
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,7 +41,7 @@ class OpenClawBridge {
         .connectTimeout(5, TimeUnit.SECONDS)
         .build()
 
-    private var sessionKey: String = newSessionKey()
+    private var sessionKey: String = "agent:main:glass"
     private val conversationHistory = mutableListOf<JSONObject>()
 
     suspend fun checkConnection() = withContext(Dispatchers.IO) {
@@ -61,6 +57,7 @@ class OpenClawBridge {
                 .url(url)
                 .get()
                 .addHeader("Authorization", "Bearer ${GeminiConfig.openClawGatewayToken}")
+                .addHeader("x-openclaw-message-channel", "glass")
                 .build()
 
             val response = pingClient.newCall(request).execute()
@@ -80,9 +77,8 @@ class OpenClawBridge {
     }
 
     fun resetSession() {
-        sessionKey = newSessionKey()
         conversationHistory.clear()
-        Log.d(TAG, "New session: $sessionKey")
+        Log.d(TAG, "Session reset (key retained: $sessionKey)")
     }
 
     suspend fun delegateTask(
@@ -126,6 +122,7 @@ class OpenClawBridge {
                 .addHeader("Authorization", "Bearer ${GeminiConfig.openClawGatewayToken}")
                 .addHeader("Content-Type", "application/json")
                 .addHeader("x-openclaw-session-key", sessionKey)
+                .addHeader("x-openclaw-message-channel", "glass")
                 .build()
 
             val response = client.newCall(request).execute()
@@ -169,10 +166,4 @@ class OpenClawBridge {
         }
     }
 
-    private fun newSessionKey(): String {
-        val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
-        formatter.timeZone = TimeZone.getTimeZone("UTC")
-        val ts = formatter.format(Date())
-        return "agent:main:glass:$ts"
-    }
 }
