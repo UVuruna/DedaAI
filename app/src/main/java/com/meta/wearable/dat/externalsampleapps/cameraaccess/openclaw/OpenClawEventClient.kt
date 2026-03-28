@@ -127,15 +127,23 @@ class OpenClawEventClient {
             put("id", UUID.randomUUID().toString())
             put("method", "connect")
             put("params", JSONObject().apply {
-                put("minProtocol", 1)
-                put("maxProtocol", 1)
+                put("minProtocol", 3)
+                put("maxProtocol", 3)
                 put("client", JSONObject().apply {
-                    put("id", "gateway-client")
+                    put("id", "android-node")
                     put("displayName", "VisionClaw Glass")
                     put("version", "1.0")
                     put("platform", "android")
-                    put("mode", "backend")
+                    put("mode", "node")
                 })
+                put("role", "node")
+                put("scopes", JSONArray())
+                put("caps", JSONArray().apply {
+                    put("camera")
+                    put("voice")
+                })
+                put("commands", JSONArray())
+                put("permissions", JSONObject())
                 put("auth", JSONObject().apply {
                     put("token", GeminiConfig.openClawGatewayToken)
                 })
