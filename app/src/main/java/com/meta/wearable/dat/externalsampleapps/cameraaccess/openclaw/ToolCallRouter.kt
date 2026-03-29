@@ -13,9 +13,11 @@ class ToolCallRouter(
 ) {
     companion object {
         private const val TAG = "ToolCallRouter"
+        private const val MAX_CONSECUTIVE_FAILURES = 3
     }
 
     private val inFlightJobs = mutableMapOf<String, Job>()
+    private var consecutiveFailures = 0
 
     fun handleToolCall(
         call: GeminiFunctionCall,
@@ -26,12 +28,29 @@ class ToolCallRouter(
 
         Log.d(TAG, "Received: $callName (id: $callId) args: ${call.args}")
 
+        // Circuit breaker: stop sending tool calls after repeated failures
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            Log.d(TAG, "Circuit breaker open ($consecutiveFailures consecutive failures), rejecting $callId")
+            val errorResult = ToolResult.Failure(
+                "Tool execution is temporarily unavailable after $consecutiveFailures consecutive failures. " +
+                "Please tell the user you cannot complete this action right now and suggest they check their OpenClaw gateway connection."
+            )
+            sendResponse(buildToolResponse(callId, callName, errorResult))
+            return
+        }
+
         val job = scope.launch {
             val taskDesc = call.args["task"]?.toString() ?: call.args.toString()
             val result = bridge.delegateTask(task = taskDesc, toolName = callName)
 
             if (!coroutineContext[Job]!!.isCancelled) {
                 Log.d(TAG, "Result for $callName (id: $callId): $result")
+
+                when (result) {
+                    is ToolResult.Success -> consecutiveFailures = 0
+                    is ToolResult.Failure -> consecutiveFailures++
+                }
+
                 val response = buildToolResponse(callId, callName, result)
                 sendResponse(response)
             } else {
@@ -61,6 +80,7 @@ class ToolCallRouter(
             job.cancel()
         }
         inFlightJobs.clear()
+        consecutiveFailures = 0
     }
 
     private fun buildToolResponse(
