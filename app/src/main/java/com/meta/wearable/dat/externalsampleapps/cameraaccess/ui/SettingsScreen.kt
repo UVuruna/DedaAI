@@ -48,6 +48,7 @@ fun SettingsScreen(
     var language by remember { mutableStateOf(SettingsManager.assistantLanguage) }
     var systemPrompt by remember { mutableStateOf(SettingsManager.geminiSystemPrompt) }
     var videoFrameMode by remember { mutableStateOf(SettingsManager.videoFrameMode) }
+    var glassesMic by remember { mutableStateOf(SettingsManager.glassesMicEnabled) }
     var webrtcSignalingURL by remember { mutableStateOf(SettingsManager.webrtcSignalingURL) }
     var showResetDialog by remember { mutableStateOf(false) }
 
@@ -55,6 +56,7 @@ fun SettingsScreen(
         SettingsManager.geminiAPIKey = geminiAPIKey.trim()
         SettingsManager.geminiSystemPrompt = systemPrompt.trim()
         SettingsManager.videoFrameMode = videoFrameMode
+        SettingsManager.glassesMicEnabled = glassesMic
         SettingsManager.webrtcSignalingURL = webrtcSignalingURL.trim()
     }
 
@@ -63,6 +65,7 @@ fun SettingsScreen(
         language = SettingsManager.assistantLanguage
         systemPrompt = SettingsManager.geminiSystemPrompt
         videoFrameMode = SettingsManager.videoFrameMode
+        glassesMic = SettingsManager.glassesMicEnabled
         webrtcSignalingURL = SettingsManager.webrtcSignalingURL
     }
 
@@ -122,6 +125,18 @@ fun SettingsScreen(
                 onSelect = { videoFrameMode = it },
             )
             Hint(videoFrameMode.description)
+
+            SectionHeader("Microphone")
+            ChipRow(
+                options = listOf(true, false),
+                selected = glassesMic,
+                labelOf = { if (it) "Glasses" else "Phone" },
+                onSelect = { glassesMic = it },
+            )
+            Hint(
+                if (glassesMic) "Listens and answers through the glasses (headset audio). Phone can stay in a pocket."
+                else "Listens through the phone mic; the answer still plays on the glasses if connected."
+            )
 
             SectionHeader("System Prompt")
             OutlinedTextField(

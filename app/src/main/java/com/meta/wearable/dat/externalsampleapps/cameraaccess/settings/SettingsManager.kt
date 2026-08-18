@@ -10,9 +10,25 @@ object SettingsManager {
 
     private lateinit var prefs: SharedPreferences
 
+    /** Application context, for components that need a system service but no UI. */
+    lateinit var appContext: Context
+        private set
+
     fun init(context: Context) {
+        appContext = context.applicationContext
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
+
+    /**
+     * Route the microphone (and, unavoidably, the answer) through the glasses'
+     * Bluetooth headset link. Without this Android records from the phone's own
+     * mic even while the glasses are streaming video — measured 2026-08-18:
+     * input BUILTIN_MIC, output A2DP. With it, the phone can stay in a pocket.
+     * The price is the headset profile's narrow-band audio in both directions.
+     */
+    var glassesMicEnabled: Boolean
+        get() = prefs.getBoolean("glassesMicEnabled", true)
+        set(value) = prefs.edit().putBoolean("glassesMicEnabled", value).apply()
 
     var geminiAPIKey: String
         get() = prefs.getString("geminiAPIKey", null) ?: Secrets.geminiAPIKey

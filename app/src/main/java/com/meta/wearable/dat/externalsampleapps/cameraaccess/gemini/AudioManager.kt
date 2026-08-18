@@ -1,13 +1,17 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.util.Log
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
 import java.io.ByteArrayOutputStream
+import android.media.AudioManager as SystemAudioManager
 
 class AudioManager {
     companion object {
@@ -34,9 +38,42 @@ class AudioManager {
     private val accumulatedData = ByteArrayOutputStream()
     private val accumulateLock = Any()
 
+    private var systemAudio: SystemAudioManager? = null
+    private var routedToHeadset = false
+
+    /**
+     * Ask Android to use the Bluetooth headset (the glasses) as the communication
+     * device. Must run before the AudioRecord is created. Falls back silently to
+     * the phone mic when no headset is connected — the phone-camera mode.
+     */
+    private fun routeToHeadsetIfWanted() {
+        if (!SettingsManager.glassesMicEnabled) return
+        val am = SettingsManager.appContext.getSystemService(Context.AUDIO_SERVICE) as SystemAudioManager
+        systemAudio = am
+        val headset = am.availableCommunicationDevices
+            .firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+        if (headset == null) {
+            Log.d(TAG, "No Bluetooth headset available — using phone mic")
+            return
+        }
+        am.mode = SystemAudioManager.MODE_IN_COMMUNICATION
+        routedToHeadset = am.setCommunicationDevice(headset)
+        Log.d(TAG, "Headset mic route to '${headset.productName}': $routedToHeadset")
+    }
+
+    private fun clearHeadsetRoute() {
+        systemAudio?.let {
+            if (routedToHeadset) it.clearCommunicationDevice()
+            it.mode = SystemAudioManager.MODE_NORMAL
+        }
+        routedToHeadset = false
+        systemAudio = null
+    }
+
     @SuppressLint("MissingPermission")
     fun startCapture() {
         if (isCapturing) return
+        routeToHeadsetIfWanted()
 
         val bufferSize = AudioRecord.getMinBufferSize(
             GeminiConfig.INPUT_AUDIO_SAMPLE_RATE,
@@ -148,6 +185,7 @@ class AudioManager {
         audioTrack?.release()
         audioTrack = null
 
+        clearHeadsetRoute()
         Log.d(TAG, "Audio capture stopped")
     }
 }
