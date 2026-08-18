@@ -52,6 +52,7 @@ class GlassesButtonService : Service() {
         private const val NOTIFICATION_ID = 2001
         const val ACTION_TOGGLE = "deda.action.TOGGLE"
         private const val RECLAIM_DELAY_MS = 700L
+        private const val HEARTBEAT_MS = 1000L
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, GlassesButtonService::class.java))
@@ -97,6 +98,7 @@ class GlassesButtonService : Service() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
         audio.unregisterAudioPlaybackCallback(playbackCallback)
         try { sessions.removeOnActiveSessionsChangedListener(sessionsListener) } catch (_: Exception) {}
         controllerCallbacks.forEach { (c, cb) -> c.unregisterCallback(cb) }
@@ -138,21 +140,42 @@ class GlassesButtonService : Service() {
                 override fun onSkipToPrevious() { Log.d(TAG, "transport: previous"); forwardPrevious() }
                 override fun onStop() { Log.d(TAG, "transport: stop") }
             })
-            setPlaybackState(
-                PlaybackState.Builder()
-                    .setActions(
-                        PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or
-                            PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or
-                            PlaybackState.ACTION_SKIP_TO_PREVIOUS
-                    )
-                    .setState(PlaybackState.STATE_PLAYING, 0, 1.0f)
-                    .build()
-            )
             isActive = true
         }
+        setSessionState(PlaybackState.STATE_PAUSED)
+    }
+
+    /**
+     * What the glasses see over AVRCP. Measured 2026-08-18: with a permanent
+     * fake PLAYING the glasses stopped sending single taps altogether (they
+     * had nothing to pause: no audio, no state change). A paused, idle player
+     * — exactly what a paused Spotify looks like — makes a single tap a PLAY,
+     * which we forward. PLAYING is reported only while our silence runs.
+     */
+    private fun setSessionState(state: Int) {
+        session?.setPlaybackState(
+            PlaybackState.Builder()
+                .setActions(
+                    PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or
+                        PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or
+                        PlaybackState.ACTION_SKIP_TO_PREVIOUS
+                )
+                .setState(state, 0, if (state == PlaybackState.STATE_PLAYING) 1.0f else 0f)
+                .build()
+        )
     }
 
     // ---- who else is playing ------------------------------------------------
+    //
+    // Owner's rule (2026-08-18): double tap is Deda's ALWAYS, also while music
+    // plays; single tap (play/pause) and triple tap (previous) stay the music
+    // app's. Android gives the buttons to the most recently started player, so:
+    //   * nobody plays  -> one second of silence, then we sit there PAUSED
+    //   * someone plays -> a silence "heartbeat" every second keeps us the most
+    //                      recent player, every tap comes to us, and we hand
+    //                      play/pause/previous straight back to the music app
+    // Our own silence is USAGE_MEDIA + CONTENT_TYPE_SONIFICATION so we can tell
+    // it apart from real music in the playback list.
 
     private val playbackCallback = object : AudioManager.AudioPlaybackCallback() {
         override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>) {
@@ -162,45 +185,64 @@ class GlassesButtonService : Service() {
     }
     private val reclaimRunnable = Runnable { reclaimIfNobodyPlays("playback change") }
 
+    private fun isOurSilence(cfg: AudioPlaybackConfiguration): Boolean =
+        cfg.audioAttributes.usage == AudioAttributes.USAGE_MEDIA &&
+            cfg.audioAttributes.contentType == AudioAttributes.CONTENT_TYPE_SONIFICATION
+
     /** True when any app other than our own silence/greeting players is active. */
     private fun othersArePlaying(): Boolean =
         audio.activePlaybackConfigurations.any { cfg ->
             val u = cfg.audioAttributes.usage
-            u != AudioAttributes.USAGE_ASSISTANT && u != AudioAttributes.USAGE_ASSISTANCE_SONIFICATION &&
-                !(u == AudioAttributes.USAGE_MEDIA && silencePlaying)
+            u != AudioAttributes.USAGE_ASSISTANT && !isOurSilence(cfg)
         }
 
-    @Volatile private var silencePlaying = false
-
-    /** True from our last silence until some other app plays again. Prevents
-     *  the silence itself (a playback change) from re-triggering a reclaim. */
+    /** True from our idle claim until some other app plays again. */
     @Volatile private var claimed = false
+    private var heartbeatOn = false
 
     private fun reclaimIfNobodyPlays(reason: String) {
         if (othersArePlaying()) {
-            if (claimed) Log.d(TAG, "someone else is playing — they own the buttons now ($reason)")
+            if (!heartbeatOn) {
+                Log.d(TAG, "someone else is playing — heartbeat on, taps still come to us ($reason)")
+                heartbeatOn = true
+                setSessionState(PlaybackState.STATE_PLAYING)
+                handler.post(heartbeat)
+            }
             claimed = false
             return
         }
+        if (heartbeatOn) {
+            heartbeatOn = false
+            handler.removeCallbacks(heartbeat)
+            Log.d(TAG, "music stopped — heartbeat off")
+        }
         if (claimed) return
-        Log.d(TAG, "nobody plays — reclaiming buttons ($reason)")
+        Log.d(TAG, "nobody plays — claiming buttons ($reason)")
         claimed = true
-        playSilence()
+        playSilence(1000) { setSessionState(PlaybackState.STATE_PAUSED) }
     }
 
-    /** One second of silence: makes us the most recent audio player. */
-    private fun playSilence() {
+    private val heartbeat = object : Runnable {
+        override fun run() {
+            if (!heartbeatOn) return
+            playSilence(200, null)
+            handler.postDelayed(this, HEARTBEAT_MS)
+        }
+    }
+
+    /** Plays [ms] of silence: makes us the most recent audio player. */
+    private fun playSilence(ms: Int, then: (() -> Unit)?) {
         if (silencePlaying) return
         Thread({
             silencePlaying = true
             try {
                 val rate = 16000
-                val bytes = rate * 2
+                val bytes = rate * 2 * ms / 1000
                 val track = AudioTrack.Builder()
                     .setAudioAttributes(
                         AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                             .build()
                     )
                     .setAudioFormat(
@@ -209,7 +251,7 @@ class GlassesButtonService : Service() {
                             .setEncoding(AudioFormat.ENCODING_PCM_16BIT).build()
                     )
                     .setTransferMode(AudioTrack.MODE_STREAM)
-                    .setBufferSizeInBytes(bytes)
+                    .setBufferSizeInBytes(maxOf(bytes, 3200))
                     .build()
                 track.play()
                 track.write(ByteArray(bytes), 0, bytes)
@@ -219,9 +261,12 @@ class GlassesButtonService : Service() {
                 Log.w(TAG, "silence failed: ${e.message}")
             } finally {
                 silencePlaying = false
+                if (then != null) handler.post(then)
             }
         }, "deda-claim-buttons").start()
     }
+
+    @Volatile private var silencePlaying = false
 
     // ---- remembering the music app --------------------------------------------
 
@@ -264,7 +309,9 @@ class GlassesButtonService : Service() {
             if (controllerCallbacks.keys.any { it.sessionToken == c.sessionToken }) return@forEach
             val cb = object : MediaController.Callback() {
                 override fun onPlaybackStateChanged(state: PlaybackState?) {
-                    if (state?.state == PlaybackState.STATE_PLAYING) {
+                    if (state?.state == PlaybackState.STATE_PLAYING &&
+                        lastOtherController?.sessionToken != c.sessionToken
+                    ) {
                         lastOtherController = c
                         Log.d(TAG, "now playing: ${c.packageName}")
                     }
@@ -300,8 +347,8 @@ class GlassesButtonService : Service() {
         Log.d(TAG, "standby ${if (on) "ON" else "OFF"} ($source)")
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification())
         greeter?.say(on)
-        // The greeting itself makes us the most recent player; re-check afterwards.
-        handler.postDelayed({ reclaimIfNobodyPlays("after greeting") }, 4000)
+        // The greeting (TTS engine) counts as "someone playing"; the playback
+        // callback settles the state again once it ends.
     }
 
     // ---- notification -----------------------------------------------------------

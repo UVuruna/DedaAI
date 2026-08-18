@@ -50,7 +50,7 @@ enum class AssistantLanguage(
     );
 
     companion object {
-        val DEFAULT = ENGLISH
+        val DEFAULT = SERBIAN // the owner's language; the Slovenian friend switches in Settings
 
         fun fromName(name: String?): AssistantLanguage =
             entries.firstOrNull { it.name == name } ?: DEFAULT

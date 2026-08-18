@@ -102,7 +102,10 @@ class Greeter(context: Context) {
         if (ttsReady) applyLocale() // the language may have changed in Settings
         val texts = Texts.forCurrentLanguage()
         if (ttsReady && ttsLocaleOk) {
-            tts?.speak(if (on) texts.listening else texts.notListening, TextToSpeech.QUEUE_FLUSH, null, "deda-greet")
+            var line = if (on) texts.listening else texts.notListening
+            // An English voice reads "Deda" as "Dee-da"; spell it the way it sounds.
+            if (SettingsManager.assistantLanguage == AssistantLanguage.ENGLISH) line = line.replace("Deda", "Deh-dah")
+            tts?.speak(line, TextToSpeech.QUEUE_FLUSH, null, "deda-greet")
         } else {
             Log.d(TAG, "no TTS voice for ${locale()} — tones instead")
             tones(on)
