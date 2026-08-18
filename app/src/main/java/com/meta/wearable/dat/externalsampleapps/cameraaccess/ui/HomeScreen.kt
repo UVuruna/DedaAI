@@ -49,7 +49,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaNotificationListener
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaState
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.Greeter
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
 @Composable
@@ -144,19 +144,20 @@ fun HomeScreen(
 
         // Deda standby switch — same thing the glasses' double tap does.
         val dedaMode by DedaState.mode.collectAsState()
+        val dedaTexts = Greeter.Texts.forCurrentLanguage()
         SwitchButton(
-            label = if (dedaMode == DedaMode.OFF) "Deda: off — turn on" else "Deda: listening — turn off",
-            onClick = { GlassesButtonService.toggle(context) },
+            label = if (dedaMode == DedaMode.OFF) dedaTexts.switchOff else dedaTexts.switchOn,
+            onClick = { viewModel.toggleDeda() },
         )
         if (!DedaNotificationListener.isEnabled(context)) {
           Text(
-              text = "For single tap to keep controlling music, allow Deda notification access.",
+              text = dedaTexts.notifAccessHint,
               color = Color.Gray,
               textAlign = TextAlign.Center,
               modifier = Modifier.padding(horizontal = 24.dp),
           )
           SwitchButton(
-              label = "Allow notification access",
+              label = dedaTexts.allowNotifAccess,
               onClick = {
                 context.startActivity(
                     android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)

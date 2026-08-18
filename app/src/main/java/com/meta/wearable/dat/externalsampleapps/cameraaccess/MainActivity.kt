@@ -94,6 +94,12 @@ class MainActivity : ComponentActivity() {
 
   fun checkPermissions(onPermissionsGranted: () -> Unit) {
     registerForActivityResult(RequestMultiplePermissions()) { permissionsResult ->
+          // The microphone foreground type only needs RECORD_AUDIO — upgrade
+          // the service as soon as that one is granted, whatever the rest did
+          // (pregled 3): the service recomputes its types on every start.
+          if (permissionsResult[RECORD_AUDIO] == true) {
+            GlassesButtonService.start(this)
+          }
           val granted = permissionsResult.entries.all { it.value }
           if (granted) {
             onPermissionsGranted()

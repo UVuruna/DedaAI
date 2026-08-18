@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- lang-ok-begin: Serbian translation file (values-sr) — user-facing strings for the assistant language -->
+    <string name="deda_listening">Deda te sluša</string>
+    <string name="deda_not_listening">Deda više ne sluša</string>
+    <string name="deda_sleeping">Deda spava</string>
+    <string name="deda_talking">Deda razgovara</string>
+    <string name="deda_double_tap_to_start">Dupli tap na naočarama: uključi</string>
+    <string name="deda_double_tap_to_stop">Dupli tap na naočarama: isključi</string>
+    <string name="deda_button_to_start">Uključi dugmetom ispod</string>
+    <string name="deda_button_to_stop">Isključi dugmetom ispod</string>
+    <string name="deda_turn_on">Uključi</string>
+    <string name="deda_turn_off">Isključi</string>
+    <string name="deda_switch_off">Deda: ugašen — uključi</string>
+    <string name="deda_switch_on">Deda: sluša — isključi</string>
+    <string name="deda_notif_access_hint">Da bi jedan tap i dalje kontrolisao muziku, dozvoli Dedi pristup notifikacijama.</string>
+    <string name="deda_allow_notif_access">Dozvoli pristup notifikacijama</string>
+    <!-- lang-ok-end -->
+</resources>

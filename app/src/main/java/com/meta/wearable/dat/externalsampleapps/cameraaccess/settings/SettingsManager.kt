@@ -30,6 +30,21 @@ object SettingsManager {
         get() = prefs.getBoolean("glassesMicEnabled", true)
         set(value) = prefs.edit().putBoolean("glassesMicEnabled", value).apply()
 
+    /** How Deda standby is switched: glasses touchpad or the notification button. */
+    var dedaActivationMode: DedaActivationMode
+        get() = DedaActivationMode.fromName(prefs.getString("dedaActivationMode", null))
+        set(value) = prefs.edit().putString("dedaActivationMode", value.name).apply()
+
+    /** A conversation closes itself after this many seconds without a question. */
+    var dedaSilenceTimeoutSec: Int
+        get() = prefs.getInt("dedaSilenceTimeoutSec", 15)
+        set(value) = prefs.edit().putInt("dedaSilenceTimeoutSec", value.coerceIn(5, 600)).apply()
+
+    /** A conversation is force-closed after this many minutes, no matter what. */
+    var dedaMaxSessionMin: Int
+        get() = prefs.getInt("dedaMaxSessionMin", 15)
+        set(value) = prefs.edit().putInt("dedaMaxSessionMin", value.coerceIn(1, 120)).apply()
+
     var geminiAPIKey: String
         get() = prefs.getString("geminiAPIKey", null) ?: Secrets.geminiAPIKey
         set(value) = prefs.edit().putString("geminiAPIKey", value).apply()

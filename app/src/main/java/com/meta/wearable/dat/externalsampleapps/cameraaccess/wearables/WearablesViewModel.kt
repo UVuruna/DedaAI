@@ -27,6 +27,7 @@ import com.meta.wearable.dat.core.types.DeviceIdentifier
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationState
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
 import com.meta.wearable.dat.mockdevice.MockDeviceKit
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Job
@@ -156,6 +157,11 @@ class WearablesViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun navigateToPhoneMode() {
     _uiState.update { it.copy(isStreaming = true, isPhoneMode = true) }
+  }
+
+  /** Same switch as the glasses' double tap / the notification button. */
+  fun toggleDeda() {
+    GlassesButtonService.toggle(getApplication())
   }
 
   fun navigateToDeviceSelection() {

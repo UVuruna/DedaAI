@@ -31,10 +31,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.assistant.AssistantLanguage
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.DedaActivationMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.VideoFrameMode
 
@@ -44,11 +47,15 @@ fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var geminiAPIKey by remember { mutableStateOf(SettingsManager.geminiAPIKey) }
     var language by remember { mutableStateOf(SettingsManager.assistantLanguage) }
     var systemPrompt by remember { mutableStateOf(SettingsManager.geminiSystemPrompt) }
     var videoFrameMode by remember { mutableStateOf(SettingsManager.videoFrameMode) }
     var glassesMic by remember { mutableStateOf(SettingsManager.glassesMicEnabled) }
+    var dedaActivation by remember { mutableStateOf(SettingsManager.dedaActivationMode) }
+    var dedaSilenceSec by remember { mutableStateOf(SettingsManager.dedaSilenceTimeoutSec.toString()) }
+    var dedaMaxMin by remember { mutableStateOf(SettingsManager.dedaMaxSessionMin.toString()) }
     var webrtcSignalingURL by remember { mutableStateOf(SettingsManager.webrtcSignalingURL) }
     var showResetDialog by remember { mutableStateOf(false) }
 
@@ -57,7 +64,11 @@ fun SettingsScreen(
         SettingsManager.geminiSystemPrompt = systemPrompt.trim()
         SettingsManager.videoFrameMode = videoFrameMode
         SettingsManager.glassesMicEnabled = glassesMic
-        SettingsManager.webrtcSignalingURL = webrtcSignalingURL.trim()
+        SettingsManager.dedaActivationMode = dedaActivation
+        dedaSilenceSec.toIntOrNull()?.let { SettingsManager.dedaSilenceTimeoutSec = it }
+        dedaMaxMin.toIntOrNull()?.let { SettingsManager.dedaMaxSessionMin = it }
+        // The always-on service re-reads the activation mode on every start.
+        GlassesButtonService.start(context)
     }
 
     fun reload() {
@@ -66,6 +77,9 @@ fun SettingsScreen(
         systemPrompt = SettingsManager.geminiSystemPrompt
         videoFrameMode = SettingsManager.videoFrameMode
         glassesMic = SettingsManager.glassesMicEnabled
+        dedaActivation = SettingsManager.dedaActivationMode
+        dedaSilenceSec = SettingsManager.dedaSilenceTimeoutSec.toString()
+        dedaMaxMin = SettingsManager.dedaMaxSessionMin.toString()
         webrtcSignalingURL = SettingsManager.webrtcSignalingURL
     }
 
@@ -137,6 +151,30 @@ fun SettingsScreen(
                 if (glassesMic) "Listens and answers through the glasses (headset audio). Phone can stay in a pocket."
                 else "Listens through the phone mic; the answer still plays on the glasses if connected."
             )
+
+            SectionHeader("Deda")
+            ChipRow(
+                options = DedaActivationMode.entries,
+                selected = dedaActivation,
+                labelOf = { it.displayName },
+                onSelect = { dedaActivation = it },
+            )
+            Hint(dedaActivation.description)
+            MonoTextField(
+                value = dedaSilenceSec,
+                onValueChange = { dedaSilenceSec = it.filter { c -> c.isDigit() } },
+                label = "Close conversation after silence (seconds)",
+                placeholder = "15",
+                keyboardType = KeyboardType.Number,
+            )
+            MonoTextField(
+                value = dedaMaxMin,
+                onValueChange = { dedaMaxMin = it.filter { c -> c.isDigit() } },
+                label = "Force-close conversation after (minutes)",
+                placeholder = "15",
+                keyboardType = KeyboardType.Number,
+            )
+            Hint("A conversation ends by itself after the silence above, and never runs longer than the cap.")
 
             SectionHeader("System Prompt")
             OutlinedTextField(

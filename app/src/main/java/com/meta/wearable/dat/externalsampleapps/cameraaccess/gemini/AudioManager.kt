@@ -1,17 +1,15 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.media.AudioAttributes
-import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import android.os.Looper
 import android.util.Log
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.HeadsetRoute
 import java.io.ByteArrayOutputStream
-import android.media.AudioManager as SystemAudioManager
 
 class AudioManager {
     companion object {
@@ -38,42 +36,12 @@ class AudioManager {
     private val accumulatedData = ByteArrayOutputStream()
     private val accumulateLock = Any()
 
-    private var systemAudio: SystemAudioManager? = null
-    private var routedToHeadset = false
-
-    /**
-     * Ask Android to use the Bluetooth headset (the glasses) as the communication
-     * device. Must run before the AudioRecord is created. Falls back silently to
-     * the phone mic when no headset is connected — the phone-camera mode.
-     */
-    private fun routeToHeadsetIfWanted() {
-        if (!SettingsManager.glassesMicEnabled) return
-        val am = SettingsManager.appContext.getSystemService(Context.AUDIO_SERVICE) as SystemAudioManager
-        systemAudio = am
-        val headset = am.availableCommunicationDevices
-            .firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
-        if (headset == null) {
-            Log.d(TAG, "No Bluetooth headset available — using phone mic")
-            return
-        }
-        am.mode = SystemAudioManager.MODE_IN_COMMUNICATION
-        routedToHeadset = am.setCommunicationDevice(headset)
-        Log.d(TAG, "Headset mic route to '${headset.productName}': $routedToHeadset")
-    }
-
-    private fun clearHeadsetRoute() {
-        systemAudio?.let {
-            if (routedToHeadset) it.clearCommunicationDevice()
-            it.mode = SystemAudioManager.MODE_NORMAL
-        }
-        routedToHeadset = false
-        systemAudio = null
-    }
-
     @SuppressLint("MissingPermission")
     fun startCapture() {
         if (isCapturing) return
-        routeToHeadsetIfWanted()
+        // Route through the glasses' mic when wanted; must happen before the
+        // AudioRecord is created. See HeadsetRoute.
+        HeadsetRoute.acquire()
 
         val bufferSize = AudioRecord.getMinBufferSize(
             GeminiConfig.INPUT_AUDIO_SAMPLE_RATE,
@@ -165,27 +133,50 @@ class AudioManager {
         if (!isCapturing) return
         isCapturing = false
 
-        captureThread?.join(1000)
+        // Everything below waits on the capture thread (up to 1 s), so it must
+        // not run on the main thread — Deda's timers and audio-focus callbacks
+        // close sessions from there (pregled 2, bug 4). The resources are
+        // captured as locals so an immediate startCapture() cannot race them.
+        val thread = captureThread
         captureThread = null
-
-        // Flush remaining accumulated audio
-        synchronized(accumulateLock) {
-            if (accumulatedData.size() > 0) {
-                val chunk = accumulatedData.toByteArray()
-                accumulatedData.reset()
-                onAudioCaptured?.invoke(chunk)
-            }
-        }
-
-        audioRecord?.stop()
-        audioRecord?.release()
+        val record = audioRecord
         audioRecord = null
-
-        audioTrack?.stop()
-        audioTrack?.release()
+        val track = audioTrack
         audioTrack = null
+        // The flush target is fixed at stop time: a session that starts during
+        // the teardown window must never receive the old session's tail.
+        val flushTo = onAudioCaptured
 
-        clearHeadsetRoute()
-        Log.d(TAG, "Audio capture stopped")
+        val finish = Runnable {
+            thread?.join(1000)
+
+            // Flush remaining accumulated audio
+            synchronized(accumulateLock) {
+                if (accumulatedData.size() > 0) {
+                    val chunk = accumulatedData.toByteArray()
+                    accumulatedData.reset()
+                    flushTo?.invoke(chunk)
+                }
+            }
+
+            // Everything here may face a capture thread still stuck in read()
+            // after the join timeout; none of it may kill the process.
+            try {
+                record?.stop()
+                record?.release()
+            } catch (e: Exception) { Log.w(TAG, "record teardown: ${e.message}") }
+            try {
+                track?.stop()
+                track?.release()
+            } catch (e: Exception) { Log.w(TAG, "track teardown: ${e.message}") }
+
+            HeadsetRoute.release()
+            Log.d(TAG, "Audio capture stopped")
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Thread(finish, "audio-capture-stop").start()
+        } else {
+            finish.run()
+        }
     }
 }

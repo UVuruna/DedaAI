@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -63,12 +64,14 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
-        <!-- Deda: owns the glasses' touchpad buttons (double tap = standby) -->
+        <!-- Deda: the glasses' touchpad buttons (double tap = standby) and,
+             since Phase 3, the wake-word standby listening (microphone type so
+             the mic keeps working with the screen locked) -->
         <service
             android:name=".deda.GlassesButtonService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:foregroundServiceType="mediaPlayback|microphone" />
 
         <!-- Empty listener: only so MediaSessionManager.getActiveSessions() is
              allowed, to hand single taps back to the music app -->

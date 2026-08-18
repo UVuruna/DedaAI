@@ -1,20 +1,14 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.stream
 
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
-import androidx.core.app.NotificationCompat
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.MainActivity
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.ServiceNotifications
 
 /**
  * Foreground service that keeps the camera streaming alive when the screen is locked
@@ -36,11 +30,7 @@ class StreamingService : Service() {
     fun start(context: Context) {
       val intent =
           Intent(context, StreamingService::class.java).apply { `package` = context.packageName }
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        context.startForegroundService(intent)
-      } else {
-        context.startService(intent)
-      }
+      context.startForegroundService(intent)
     }
 
     fun stop(context: Context) {
@@ -63,17 +53,11 @@ class StreamingService : Service() {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     Log.d(TAG, "Service started")
 
-    val notification = createNotification()
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      startForeground(
-          NOTIFICATION_ID,
-          notification,
-          ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
-      )
-    } else {
-      startForeground(NOTIFICATION_ID, notification)
-    }
+    startForeground(
+        NOTIFICATION_ID,
+        createNotification(),
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+    )
 
     acquireWakeLock()
 
@@ -87,44 +71,18 @@ class StreamingService : Service() {
   }
 
   private fun createNotificationChannel() {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      val channel =
-          NotificationChannel(
-                  CHANNEL_ID,
-                  CHANNEL_NAME,
-                  NotificationManager.IMPORTANCE_LOW,
-              )
-              .apply {
-                description = "Notifications for active camera streaming"
-                setShowBadge(false)
-              }
-
-      val notificationManager = getSystemService(NotificationManager::class.java)
-      notificationManager.createNotificationChannel(channel)
-    }
+    ServiceNotifications.ensureChannel(
+        this, CHANNEL_ID, CHANNEL_NAME, "Notifications for active camera streaming")
   }
 
-  private fun createNotification(): Notification {
-    val pendingIntent =
-        PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java).apply {
-              flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-
-    return NotificationCompat.Builder(this, CHANNEL_ID)
-        .setContentTitle("Camera Streaming")
-        .setContentText("Streaming from your glasses...")
-        .setSmallIcon(R.drawable.ic_launcher_foreground)
-        .setOngoing(true)
-        .setContentIntent(pendingIntent)
-        .setPriority(NotificationCompat.PRIORITY_LOW)
-        .setCategory(NotificationCompat.CATEGORY_SERVICE)
-        .build()
-  }
+  private fun createNotification(): Notification =
+      ServiceNotifications.builder(
+              this,
+              CHANNEL_ID,
+              title = "Camera Streaming",
+              text = "Streaming from your glasses...",
+          )
+          .build()
 
   private fun acquireWakeLock() {
     if (wakeLock == null) {

@@ -48,6 +48,23 @@
     <string name="has_captured_image" description="Has captured image">Has captured image</string>
     <string name="no_captured_image" description="No captured image">No captured image</string>
 
+    <!-- Deda (assistant) — sr/sl translations live in values-sr/ and values-sl/;
+         resolved against the in-app assistant language via Greeter.Texts, not the system locale -->
+    <string name="deda_listening" description="Spoken + shown when standby turns on">Deda is listening</string>
+    <string name="deda_not_listening" description="Spoken + shown when standby turns off">Deda is not listening anymore</string>
+    <string name="deda_sleeping" description="Notification title while off">Deda is asleep</string>
+    <string name="deda_talking" description="Notification title during a conversation">Deda is talking</string>
+    <string name="deda_double_tap_to_start" description="Notification hint while off, tap mode">Double-tap the glasses to turn on</string>
+    <string name="deda_double_tap_to_stop" description="Notification hint while on, tap mode">Double-tap the glasses to turn off</string>
+    <string name="deda_button_to_start" description="Notification hint while off, notification mode">Turn on with the button below</string>
+    <string name="deda_button_to_stop" description="Notification hint while on, notification mode">Turn off with the button below</string>
+    <string name="deda_turn_on" description="Notification action">Turn on</string>
+    <string name="deda_turn_off" description="Notification action">Turn off</string>
+    <string name="deda_switch_off" description="Home screen switch while off">Deda: off — turn on</string>
+    <string name="deda_switch_on" description="Home screen switch while on">Deda: listening — turn off</string>
+    <string name="deda_notif_access_hint" description="Why notification access is needed">For single tap to keep controlling music, allow Deda notification access.</string>
+    <string name="deda_allow_notif_access" description="Button opening notification access settings">Allow notification access</string>
+
     <!-- Getting Started Sheet -->
     <string name="getting_started_title" description="Getting Started sheet title">Getting started</string>
     <string name="getting_started_tip_permission" description="Tip about camera permission">First, Camera Access needs permission to use your glasses camera.</string>
