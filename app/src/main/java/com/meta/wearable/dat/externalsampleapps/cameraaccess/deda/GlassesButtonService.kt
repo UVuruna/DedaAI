@@ -52,7 +52,6 @@ class GlassesButtonService : Service() {
         private const val NOTIFICATION_ID = 2001
         const val ACTION_TOGGLE = "deda.action.TOGGLE"
         private const val RECLAIM_DELAY_MS = 700L
-        private const val HEARTBEAT_MS = 1000L
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, GlassesButtonService::class.java))
@@ -167,15 +166,20 @@ class GlassesButtonService : Service() {
 
     // ---- who else is playing ------------------------------------------------
     //
-    // Owner's rule (2026-08-18): double tap is Deda's ALWAYS, also while music
-    // plays; single tap (play/pause) and triple tap (previous) stay the music
-    // app's. Android gives the buttons to the most recently started player, so:
-    //   * nobody plays  -> one second of silence, then we sit there PAUSED
-    //   * someone plays -> a silence "heartbeat" every second keeps us the most
-    //                      recent player, every tap comes to us, and we hand
-    //                      play/pause/previous straight back to the music app
-    // Our own silence is USAGE_MEDIA + CONTENT_TYPE_SONIFICATION so we can tell
-    // it apart from real music in the playback list.
+    // HARD LIMIT proven on this device (2026-08-18) and by the AOSP media-button
+    // routing rule: every touchpad tap (single/double/triple) is one AVRCP
+    // PASS_THROUGH to a SINGLE "addressed player" (the media-button session).
+    // You cannot send double-tap to us while single-tap goes to the music app.
+    // While music actually plays, the music app IS that session, and no silent
+    // "heartbeat" reliably steals it (measured: double-tap still skipped the
+    // Spotify track). So we DO NOT fight during playback — the buttons stay the
+    // music app's, and single/double/triple behave natively and reliably.
+    //
+    // We only own the buttons when NOTHING else is playing (we claim once with a
+    // short silence and then sit reported as PAUSED, like a paused music app).
+    // In that window: double tap -> toggle Deda; single tap -> resume the last
+    // music app; triple -> previous. The reliable always-on control is the wake
+    // word ("Hej Deda") and the in-app / notification toggle.
 
     private val playbackCallback = object : AudioManager.AudioPlaybackCallback() {
         override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>) {
@@ -198,39 +202,22 @@ class GlassesButtonService : Service() {
 
     /** True from our idle claim until some other app plays again. */
     @Volatile private var claimed = false
-    private var heartbeatOn = false
 
     private fun reclaimIfNobodyPlays(reason: String) {
         if (othersArePlaying()) {
-            if (!heartbeatOn) {
-                Log.d(TAG, "someone else is playing — heartbeat on, taps still come to us ($reason)")
-                heartbeatOn = true
-                setSessionState(PlaybackState.STATE_PLAYING)
-                handler.post(heartbeat)
-            }
+            // Music owns the buttons now — leave them alone so single/double/
+            // triple stay native and reliable. We regain them when it stops.
+            if (claimed) Log.d(TAG, "music started — buttons are the music app's now ($reason)")
             claimed = false
             return
         }
-        if (heartbeatOn) {
-            heartbeatOn = false
-            handler.removeCallbacks(heartbeat)
-            Log.d(TAG, "music stopped — heartbeat off")
-        }
         if (claimed) return
-        Log.d(TAG, "nobody plays — claiming buttons ($reason)")
+        Log.d(TAG, "nobody plays — claiming buttons once ($reason)")
         claimed = true
         playSilence(1000) { setSessionState(PlaybackState.STATE_PAUSED) }
     }
 
-    private val heartbeat = object : Runnable {
-        override fun run() {
-            if (!heartbeatOn) return
-            playSilence(200, null)
-            handler.postDelayed(this, HEARTBEAT_MS)
-        }
-    }
-
-    /** Plays [ms] of silence: makes us the most recent audio player. */
+    /** Plays [ms] of silence once: makes us the most recent audio player. */
     private fun playSilence(ms: Int, then: (() -> Unit)?) {
         if (silencePlaying) return
         Thread({
