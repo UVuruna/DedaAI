@@ -91,6 +91,7 @@ class GlassesButtonService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!watchingOthers) watchOtherSessions() // access may have been granted since onCreate
         if (intent?.action == ACTION_TOGGLE) toggleStandby("notification/app")
         return START_STICKY
     }
@@ -111,6 +112,10 @@ class GlassesButtonService : Service() {
     private fun startSession() {
         session = MediaSession(this, "Deda").apply {
             setCallback(object : MediaSession.Callback() {
+                // The Bluetooth AVRCP service may deliver a tap either as a raw key
+                // (onMediaButtonEvent) or, when it knows our session as the
+                // "addressed player", as a transport command (onPlay/onSkipToNext).
+                // Handle both paths the same way.
                 override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
                     val event = mediaButtonIntent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
                         ?: return true
@@ -122,12 +127,16 @@ class GlassesButtonService : Service() {
                         KeyEvent.KEYCODE_MEDIA_PAUSE,
                         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                         KeyEvent.KEYCODE_HEADSETHOOK -> forwardPlayPause()
-                        KeyEvent.KEYCODE_MEDIA_PREVIOUS ->
-                            lastOtherController?.transportControls?.skipToPrevious()
-                        else -> {}
+                        KeyEvent.KEYCODE_MEDIA_PREVIOUS -> forwardPrevious()
+                        else -> return super.onMediaButtonEvent(mediaButtonIntent)
                     }
                     return true
                 }
+                override fun onPlay() { Log.d(TAG, "transport: play"); forwardPlayPause() }
+                override fun onPause() { Log.d(TAG, "transport: pause"); forwardPlayPause() }
+                override fun onSkipToNext() { Log.d(TAG, "transport: next"); toggleStandby("double tap") }
+                override fun onSkipToPrevious() { Log.d(TAG, "transport: previous"); forwardPrevious() }
+                override fun onStop() { Log.d(TAG, "transport: stop") }
             })
             setPlaybackState(
                 PlaybackState.Builder()
@@ -220,6 +229,8 @@ class GlassesButtonService : Service() {
         rememberOthers(list ?: emptyList())
     }
 
+    private var watchingOthers = false
+
     private fun watchOtherSessions() {
         if (!DedaNotificationListener.isEnabled(this)) {
             Log.w(TAG, "notification access not granted — single tap cannot be forwarded to the music app")
@@ -229,6 +240,8 @@ class GlassesButtonService : Service() {
         try {
             sessions.addOnActiveSessionsChangedListener(sessionsListener, cn, handler)
             rememberOthers(sessions.getActiveSessions(cn))
+            watchingOthers = true
+            Log.d(TAG, "watching other media sessions")
         } catch (e: SecurityException) {
             Log.w(TAG, "getActiveSessions denied: ${e.message}")
         }
@@ -262,7 +275,13 @@ class GlassesButtonService : Service() {
         }
     }
 
+    private fun forwardPrevious() {
+        lastOtherController?.transportControls?.skipToPrevious()
+            ?: Log.d(TAG, "previous: no music app to forward to")
+    }
+
     private fun forwardPlayPause() {
+        if (!watchingOthers) watchOtherSessions()
         val target = lastOtherController
         if (target == null) {
             Log.d(TAG, "single tap: no music app to forward to")
