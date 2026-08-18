@@ -33,6 +33,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class MainActivity : ComponentActivity() {
+  private var glassesButtons: com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.GlassesButtonListener? = null
+
+  override fun onDestroy() {
+    glassesButtons?.stop()
+    glassesButtons = null
+    super.onDestroy()
+  }
   companion object {
     val PERMISSIONS: Array<String> = arrayOf(
         BLUETOOTH, BLUETOOTH_CONNECT, INTERNET, RECORD_AUDIO, CAMERA,
@@ -66,6 +73,9 @@ class MainActivity : ComponentActivity() {
 
     // Initialize settings with app context
     SettingsManager.init(this)
+    // SPIKE: listen for glasses media keys from the moment the app opens, with
+    // NO glasses stream running — the real standby scenario for double-tap.
+    glassesButtons = com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.GlassesButtonListener(this).also { it.start() }
 
     // Keep screen on while streaming
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
