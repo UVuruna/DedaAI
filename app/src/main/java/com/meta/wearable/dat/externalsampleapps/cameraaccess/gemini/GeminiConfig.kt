@@ -23,7 +23,7 @@ object GeminiConfig {
      */
     const val ON_QUESTION_MIN_INTERVAL_MS = 2000L
 
-    const val VIDEO_JPEG_QUALITY = 50
+    const val VIDEO_JPEG_QUALITY = 80 // one frame per question, so we can afford it (was 50 at 1 fps)
 
     val language: AssistantLanguage
         get() = SettingsManager.assistantLanguage
