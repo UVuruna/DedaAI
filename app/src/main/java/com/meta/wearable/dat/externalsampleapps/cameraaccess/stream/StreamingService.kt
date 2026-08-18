@@ -51,7 +51,6 @@ class StreamingService : Service() {
   }
 
   private var wakeLock: PowerManager.WakeLock? = null
-  private var buttons: GlassesButtonListener? = null
 
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -77,17 +76,12 @@ class StreamingService : Service() {
     }
 
     acquireWakeLock()
-    if (buttons == null) {
-      buttons = GlassesButtonListener(this).also { it.start() }
-    }
 
     return START_STICKY
   }
 
   override fun onDestroy() {
     Log.d(TAG, "Service destroyed")
-    buttons?.stop()
-    buttons = null
     releaseWakeLock()
     super.onDestroy()
   }

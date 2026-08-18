@@ -32,6 +32,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,6 +46,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaMode
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaNotificationListener
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaState
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
 @Composable
@@ -135,6 +141,30 @@ fun HomeScreen(
             label = "Start on Phone",
             onClick = { viewModel.navigateToPhoneMode() },
         )
+
+        // Deda standby switch — same thing the glasses' double tap does.
+        val dedaMode by DedaState.mode.collectAsState()
+        SwitchButton(
+            label = if (dedaMode == DedaMode.OFF) "Deda: off — turn on" else "Deda: listening — turn off",
+            onClick = { GlassesButtonService.toggle(context) },
+        )
+        if (!DedaNotificationListener.isEnabled(context)) {
+          Text(
+              text = "For single tap to keep controlling music, allow Deda notification access.",
+              color = Color.Gray,
+              textAlign = TextAlign.Center,
+              modifier = Modifier.padding(horizontal = 24.dp),
+          )
+          SwitchButton(
+              label = "Allow notification access",
+              onClick = {
+                context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+              },
+          )
+        }
       }
     }
   }
