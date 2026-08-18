@@ -3,6 +3,7 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.settings
 import android.content.Context
 import android.content.SharedPreferences
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.Secrets
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.assistant.AssistantLanguage
 
 object SettingsManager {
     private const val PREFS_NAME = "visionclaw_settings"
@@ -17,68 +18,55 @@ object SettingsManager {
         get() = prefs.getString("geminiAPIKey", null) ?: Secrets.geminiAPIKey
         set(value) = prefs.edit().putString("geminiAPIKey", value).apply()
 
-    var geminiSystemPrompt: String
-        get() = prefs.getString("geminiSystemPrompt", null) ?: DEFAULT_SYSTEM_PROMPT
-        set(value) = prefs.edit().putString("geminiSystemPrompt", value).apply()
-
-    var openClawHost: String
-        get() = prefs.getString("openClawHost", null) ?: Secrets.openClawHost
-        set(value) = prefs.edit().putString("openClawHost", value).apply()
-
-    var openClawPort: Int
-        get() {
-            val stored = prefs.getInt("openClawPort", 0)
-            return if (stored != 0) stored else Secrets.openClawPort
+    /**
+     * The language the assistant speaks. Runtime setting, not a build constant —
+     * the same APK is installed for users in different countries.
+     */
+    var assistantLanguage: AssistantLanguage
+        get() = AssistantLanguage.fromName(prefs.getString("assistantLanguage", null))
+        set(value) {
+            val previous = assistantLanguage
+            prefs.edit().putString("assistantLanguage", value.name).apply()
+            // A prompt the user never edited belongs to the old language, so it
+            // must follow the switch. An edited one is theirs and stays put.
+            if (!hasCustomSystemPrompt || systemPromptOverride == previous.systemPrompt) {
+                clearSystemPromptOverride()
+            }
         }
-        set(value) = prefs.edit().putInt("openClawPort", value).apply()
 
-    var openClawHookToken: String
-        get() = prefs.getString("openClawHookToken", null) ?: Secrets.openClawHookToken
-        set(value) = prefs.edit().putString("openClawHookToken", value).apply()
+    /**
+     * The system prompt actually sent to the backend: the user's own text when
+     * they have edited it, otherwise the default for the chosen language.
+     */
+    var geminiSystemPrompt: String
+        get() = systemPromptOverride ?: assistantLanguage.systemPrompt
+        set(value) {
+            if (value.trim() == assistantLanguage.systemPrompt.trim()) {
+                clearSystemPromptOverride()
+            } else {
+                prefs.edit().putString("geminiSystemPrompt", value).apply()
+            }
+        }
 
-    var openClawGatewayToken: String
-        get() = prefs.getString("openClawGatewayToken", null) ?: Secrets.openClawGatewayToken
-        set(value) = prefs.edit().putString("openClawGatewayToken", value).apply()
+    val hasCustomSystemPrompt: Boolean
+        get() = systemPromptOverride != null
+
+    private val systemPromptOverride: String?
+        get() = prefs.getString("geminiSystemPrompt", null)
+
+    fun clearSystemPromptOverride() {
+        prefs.edit().remove("geminiSystemPrompt").apply()
+    }
 
     var webrtcSignalingURL: String
         get() = prefs.getString("webrtcSignalingURL", null) ?: Secrets.webrtcSignalingURL
         set(value) = prefs.edit().putString("webrtcSignalingURL", value).apply()
 
-    var videoStreamingEnabled: Boolean
-        get() = prefs.getBoolean("videoStreamingEnabled", true)
-        set(value) = prefs.edit().putBoolean("videoStreamingEnabled", value).apply()
-
-    var proactiveNotificationsEnabled: Boolean
-        get() = prefs.getBoolean("proactiveNotificationsEnabled", true)
-        set(value) = prefs.edit().putBoolean("proactiveNotificationsEnabled", value).apply()
+    var videoFrameMode: VideoFrameMode
+        get() = VideoFrameMode.fromName(prefs.getString("videoFrameMode", null))
+        set(value) = prefs.edit().putString("videoFrameMode", value.name).apply()
 
     fun resetAll() {
         prefs.edit().clear().apply()
     }
-
-    const val DEFAULT_SYSTEM_PROMPT = """You are an AI assistant for someone wearing Meta Ray-Ban smart glasses. You can see through their camera and have a voice conversation. Keep responses concise and natural.
-
-CRITICAL: You have NO memory, NO storage, and NO ability to take actions on your own. You cannot remember things, keep lists, set reminders, search the web, send messages, or do anything persistent. You are ONLY a voice interface.
-
-You have exactly ONE tool: execute. This connects you to a powerful personal assistant that can do anything -- send messages, search the web, manage lists, set reminders, create notes, research topics, control smart home devices, interact with apps, and much more.
-
-ALWAYS use execute when the user asks you to:
-- Send a message to someone (any platform: WhatsApp, Telegram, iMessage, Slack, etc.)
-- Search or look up anything (web, local info, facts, news)
-- Add, create, or modify anything (shopping lists, reminders, notes, todos, events)
-- Research, analyze, or draft anything
-- Control or interact with apps, devices, or services
-- Remember or store any information for later
-
-Be detailed in your task description. Include all relevant context: names, content, platforms, quantities, etc. The assistant works better with complete information.
-
-NEVER pretend to do these things yourself.
-
-IMPORTANT: Before calling execute, ALWAYS speak a brief acknowledgment first. For example:
-- "Sure, let me add that to your shopping list." then call execute.
-- "Got it, searching for that now." then call execute.
-- "On it, sending that message." then call execute.
-Never call execute silently -- the user needs verbal confirmation that you heard them and are working on it. The tool may take several seconds to complete, so the acknowledgment lets them know something is happening.
-
-For messages, confirm recipient and content before delegating unless clearly urgent."""
 }

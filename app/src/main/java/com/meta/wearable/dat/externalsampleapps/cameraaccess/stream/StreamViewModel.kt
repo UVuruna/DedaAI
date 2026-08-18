@@ -111,7 +111,7 @@ class StreamViewModel(
     manager.onFrameCaptured = { bitmap ->
       _uiState.update { it.copy(videoFrame = bitmap) }
       // Forward to Gemini (throttled inside the VM)
-      geminiViewModel?.sendVideoFrameIfThrottled(bitmap)
+      geminiViewModel?.onCameraFrame(bitmap)
       // Forward to WebRTC (every frame)
       webrtcViewModel?.pushVideoFrame(bitmap)
     }
@@ -238,7 +238,7 @@ class StreamViewModel(
     _uiState.update { it.copy(videoFrame = bitmap) }
 
     // Forward to Gemini (throttled inside the VM)
-    geminiViewModel?.sendVideoFrameIfThrottled(bitmap)
+    geminiViewModel?.onCameraFrame(bitmap)
     // Forward to WebRTC (every frame)
     webrtcViewModel?.pushVideoFrame(bitmap)
   }

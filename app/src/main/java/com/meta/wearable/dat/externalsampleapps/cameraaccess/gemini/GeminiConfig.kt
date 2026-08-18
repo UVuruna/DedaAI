@@ -1,5 +1,6 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini
 
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.assistant.AssistantLanguage
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
 
 object GeminiConfig {
@@ -12,37 +13,35 @@ object GeminiConfig {
     const val AUDIO_CHANNELS = 1
     const val AUDIO_BITS_PER_SAMPLE = 16
 
+    /** Minimum gap between frames in VideoFrameMode.STREAM. */
     const val VIDEO_FRAME_INTERVAL_MS = 1000L
+
+    /**
+     * Minimum gap between frames in VideoFrameMode.ON_QUESTION. Guards against
+     * the local detector re-triggering inside a single sentence; it does not
+     * throttle across separate questions.
+     */
+    const val ON_QUESTION_MIN_INTERVAL_MS = 2000L
+
     const val VIDEO_JPEG_QUALITY = 50
+
+    val language: AssistantLanguage
+        get() = SettingsManager.assistantLanguage
 
     val systemInstruction: String
         get() = SettingsManager.geminiSystemPrompt
 
+    val speechLanguageCode: String?
+        get() = language.speechLanguageCode
+
     val apiKey: String
         get() = SettingsManager.geminiAPIKey
 
-    val openClawHost: String
-        get() = SettingsManager.openClawHost
-
-    val openClawPort: Int
-        get() = SettingsManager.openClawPort
-
-    val openClawHookToken: String
-        get() = SettingsManager.openClawHookToken
-
-    val openClawGatewayToken: String
-        get() = SettingsManager.openClawGatewayToken
-
     fun websocketURL(): String? {
-        if (apiKey == "YOUR_GEMINI_API_KEY" || apiKey.isEmpty()) return null
+        if (!isConfigured) return null
         return "$WEBSOCKET_BASE_URL?key=$apiKey"
     }
 
     val isConfigured: Boolean
         get() = apiKey != "YOUR_GEMINI_API_KEY" && apiKey.isNotEmpty()
-
-    val isOpenClawConfigured: Boolean
-        get() = openClawGatewayToken != "YOUR_OPENCLAW_GATEWAY_TOKEN"
-                && openClawGatewayToken.isNotEmpty()
-                && openClawHost != "http://YOUR_MAC_HOSTNAME.local"
 }

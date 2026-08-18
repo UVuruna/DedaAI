@@ -2,6 +2,7 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,14 +14,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -34,7 +34,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.assistant.AssistantLanguage
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.VideoFrameMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,38 +45,34 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var geminiAPIKey by remember { mutableStateOf(SettingsManager.geminiAPIKey) }
+    var language by remember { mutableStateOf(SettingsManager.assistantLanguage) }
     var systemPrompt by remember { mutableStateOf(SettingsManager.geminiSystemPrompt) }
-    var openClawHost by remember { mutableStateOf(SettingsManager.openClawHost) }
-    var openClawPort by remember { mutableStateOf(SettingsManager.openClawPort.toString()) }
-    var openClawHookToken by remember { mutableStateOf(SettingsManager.openClawHookToken) }
-    var openClawGatewayToken by remember { mutableStateOf(SettingsManager.openClawGatewayToken) }
+    var videoFrameMode by remember { mutableStateOf(SettingsManager.videoFrameMode) }
     var webrtcSignalingURL by remember { mutableStateOf(SettingsManager.webrtcSignalingURL) }
-    var videoStreamingEnabled by remember { mutableStateOf(SettingsManager.videoStreamingEnabled) }
-    var proactiveNotificationsEnabled by remember { mutableStateOf(SettingsManager.proactiveNotificationsEnabled) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     fun save() {
         SettingsManager.geminiAPIKey = geminiAPIKey.trim()
         SettingsManager.geminiSystemPrompt = systemPrompt.trim()
-        SettingsManager.openClawHost = openClawHost.trim()
-        openClawPort.trim().toIntOrNull()?.let { SettingsManager.openClawPort = it }
-        SettingsManager.openClawHookToken = openClawHookToken.trim()
-        SettingsManager.openClawGatewayToken = openClawGatewayToken.trim()
+        SettingsManager.videoFrameMode = videoFrameMode
         SettingsManager.webrtcSignalingURL = webrtcSignalingURL.trim()
-        SettingsManager.videoStreamingEnabled = videoStreamingEnabled
-        SettingsManager.proactiveNotificationsEnabled = proactiveNotificationsEnabled
     }
 
     fun reload() {
         geminiAPIKey = SettingsManager.geminiAPIKey
+        language = SettingsManager.assistantLanguage
         systemPrompt = SettingsManager.geminiSystemPrompt
-        openClawHost = SettingsManager.openClawHost
-        openClawPort = SettingsManager.openClawPort.toString()
-        openClawHookToken = SettingsManager.openClawHookToken
-        openClawGatewayToken = SettingsManager.openClawGatewayToken
+        videoFrameMode = SettingsManager.videoFrameMode
         webrtcSignalingURL = SettingsManager.webrtcSignalingURL
-        videoStreamingEnabled = SettingsManager.videoStreamingEnabled
-        proactiveNotificationsEnabled = SettingsManager.proactiveNotificationsEnabled
+    }
+
+    // Switching language rewrites the prompt in the box, unless the user has
+    // written their own. A hand-edited prompt is never discarded silently.
+    fun selectLanguage(next: AssistantLanguage) {
+        SettingsManager.geminiSystemPrompt = systemPrompt.trim()
+        SettingsManager.assistantLanguage = next
+        language = next
+        systemPrompt = SettingsManager.geminiSystemPrompt
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -98,7 +96,6 @@ fun SettingsScreen(
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Gemini section
             SectionHeader("Gemini API")
             MonoTextField(
                 value = geminiAPIKey,
@@ -106,6 +103,25 @@ fun SettingsScreen(
                 label = "API Key",
                 placeholder = "Enter Gemini API key",
             )
+            Hint("Free key from aistudio.google.com/apikey. No card required.")
+
+            SectionHeader("Language")
+            ChipRow(
+                options = AssistantLanguage.entries,
+                selected = language,
+                labelOf = { it.displayName },
+                onSelect = { selectLanguage(it) },
+            )
+            Hint("The language the assistant answers in.")
+
+            SectionHeader("Camera")
+            ChipRow(
+                options = VideoFrameMode.entries,
+                selected = videoFrameMode,
+                labelOf = { it.displayName },
+                onSelect = { videoFrameMode = it },
+            )
+            Hint(videoFrameMode.description)
 
             SectionHeader("System Prompt")
             OutlinedTextField(
@@ -115,37 +131,15 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().height(200.dp),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
             )
+            if (systemPrompt.trim() != language.systemPrompt.trim()) {
+                TextButton(onClick = {
+                    SettingsManager.clearSystemPromptOverride()
+                    systemPrompt = SettingsManager.geminiSystemPrompt
+                }) {
+                    Text("Restore default for " + language.displayName)
+                }
+            }
 
-            // OpenClaw section
-            SectionHeader("OpenClaw")
-            MonoTextField(
-                value = openClawHost,
-                onValueChange = { openClawHost = it },
-                label = "Host",
-                placeholder = "http://your-mac.local",
-                keyboardType = KeyboardType.Uri,
-            )
-            MonoTextField(
-                value = openClawPort,
-                onValueChange = { openClawPort = it },
-                label = "Port",
-                placeholder = "18789",
-                keyboardType = KeyboardType.Number,
-            )
-            MonoTextField(
-                value = openClawHookToken,
-                onValueChange = { openClawHookToken = it },
-                label = "Hook Token",
-                placeholder = "Hook token",
-            )
-            MonoTextField(
-                value = openClawGatewayToken,
-                onValueChange = { openClawGatewayToken = it },
-                label = "Gateway Token",
-                placeholder = "Gateway auth token",
-            )
-
-            // WebRTC section
             SectionHeader("WebRTC")
             MonoTextField(
                 value = webrtcSignalingURL,
@@ -154,50 +148,8 @@ fun SettingsScreen(
                 placeholder = "wss://your-server.example.com",
                 keyboardType = KeyboardType.Uri,
             )
+            Hint("Optional. Only needed to mirror the view to a browser.")
 
-            // Video
-            SectionHeader("Video")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text("Video Streaming", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "Disable to save battery. Audio remains active.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = videoStreamingEnabled,
-                    onCheckedChange = { videoStreamingEnabled = it },
-                )
-            }
-
-            // Notifications
-            SectionHeader("Notifications")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text("Proactive Notifications", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "Receive updates from OpenClaw spoken through glasses.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = proactiveNotificationsEnabled,
-                    onCheckedChange = { proactiveNotificationsEnabled = it },
-                )
-            }
-
-            // Reset
             TextButton(onClick = { showResetDialog = true }) {
                 Text("Reset to Defaults", color = Color.Red)
             }
@@ -230,11 +182,38 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun <T> ChipRow(
+    options: List<T>,
+    selected: T,
+    labelOf: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { option ->
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelect(option) },
+                label = { Text(labelOf(option)) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun SectionHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+private fun Hint(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

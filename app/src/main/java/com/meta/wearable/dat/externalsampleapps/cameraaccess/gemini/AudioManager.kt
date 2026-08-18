@@ -17,6 +17,15 @@ class AudioManager {
 
     var onAudioCaptured: ((ByteArray) -> Unit)? = null
 
+    /**
+     * Fires on the first syllable of an utterance, detected locally from the
+     * signal level. Used to send a camera frame while the user is still asking,
+     * instead of streaming frames on a timer. See [SpeechActivityDetector].
+     */
+    var onSpeechStart: (() -> Unit)? = null
+
+    private val speechDetector = SpeechActivityDetector()
+
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
     private var captureThread: Thread? = null
@@ -75,6 +84,9 @@ class AudioManager {
             accumulatedData.reset()
         }
 
+        speechDetector.reset()
+        speechDetector.onSpeechStart = { onSpeechStart?.invoke() }
+
         captureThread = Thread({
             val buffer = ByteArray(bufferSize)
             var tapCount = 0
@@ -82,6 +94,7 @@ class AudioManager {
                 val read = audioRecord?.read(buffer, 0, buffer.size) ?: break
                 if (read > 0) {
                     tapCount++
+                    speechDetector.process(buffer, read)
                     synchronized(accumulateLock) {
                         accumulatedData.write(buffer, 0, read)
                         if (accumulatedData.size() >= MIN_SEND_BYTES) {
