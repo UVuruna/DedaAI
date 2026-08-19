@@ -33,8 +33,8 @@ import kotlinx.coroutines.launch
  * whenever nothing else is playing audio, so that:
  *
  *   double tap (KEYCODE_MEDIA_NEXT)      -> toggle Deda STANDBY on/off
- *   single tap (PLAY/PAUSE/HEADSETHOOK)  -> forwarded to the app that was
- *                                           playing music before us
+ *   single tap while Deda is on          -> Deda off; music it paused resumes
+ *                                           via the released transient focus
  *   while music actually plays           -> we do nothing; Android routes
  *                                           the taps to the music app itself
  *

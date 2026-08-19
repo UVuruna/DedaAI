@@ -1,3 +1,9 @@
+"""STALE GENERATOR - DO NOT RE-RUN AS-IS (2026-08-20).
+docs/install.html has since been edited BY HAND: hero download buttons
+(one per language) and the real 17 MB size. Regenerating from this
+script would silently revert those. Port the hand edits here first
+(tracked as T39), then delete this notice.
+"""
 # -*- coding: utf-8 -*-
 """Builds the trilingual illustrated INSTALL guide (release/deda-repo/install.html)
 — the page a new user lands on after scanning the QR code. Same design system as
@@ -115,7 +121,7 @@ def mock(name, c):
           '<div class="call" style="top:48px;left:120px">' + c['blocker'] + '</div>')
     if name == 'install':
         return phone('<div class="adlg"><div class="adt">Deda 👓</div>'
-          '<div class="adb">Ray-Ban Meta • 146 MB</div>'
+          '<div class="adb">Ray-Ban Meta • 17 MB</div>'
           '<div class="adrow"><button class="adbtn">' + c['pp_no'] + '</button><button class="adbtn strong">' + c['inst'] + '</button></div></div>'
           '<div class="call" style="top:120px;left:120px">' + c['install'] + '</div>')
     if name == 'perm':

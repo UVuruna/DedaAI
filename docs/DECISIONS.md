@@ -52,3 +52,9 @@ report each one came from live here — read the entry before arguing with it.
   gate had to learn his actual phrasing twice: "pravi apk" (2026-08-19,
   "apk" wasn't in the recognized word list) and "bill" (2026-08-19, his
   phone's voice keyboard turned "build" into "bill").
+- **2026-08-20** — No notification listener in the app, ever. Google Play
+  Protect hard-blocks a sideloaded APK that declares one (“sensitive
+  data”, no Install-anyway offered) — the owner hit exactly that dialog.
+  The listener only powered handing single taps back to the music app;
+  music paused by Deda resumes via the released transient audio focus
+  instead. Trade accepted: a tap cannot START music that was not playing.
