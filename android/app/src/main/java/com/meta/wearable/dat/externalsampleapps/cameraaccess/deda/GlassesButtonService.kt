@@ -11,9 +11,7 @@ import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.AudioPlaybackConfiguration
-import android.media.session.MediaController
 import android.media.session.MediaSession
-import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.IBinder
@@ -44,10 +42,15 @@ import kotlinx.coroutines.launch
  * audio (AudioPlayerStateMonitor), not to whoever registers a session. So we
  * (1) hold an active session, (2) watch AudioManager playback configs and,
  * the moment no other app is playing, play one second of silence to become
- * "most recent", (3) forward single taps via MediaController — which needs
- * the notification-listener binding (DedaNotificationListener).
- * Verified on Gen 1 glasses + S25 Ultra 2026-08-18: double tap arrives as
- * KEYCODE_MEDIA_NEXT from com.android.bluetooth.
+ * "most recent". Verified on Gen 1 glasses + S25 Ultra 2026-08-18: double tap
+ * arrives as KEYCODE_MEDIA_NEXT from com.android.bluetooth.
+ *
+ * There is deliberately NO notification-listener here (2026-08-20): declaring
+ * one made Google Play Protect hard-block the sideloaded install ("sensitive
+ * data", no Install-anyway offered). It only powered handing single taps back
+ * to the exact music app; music paused by Deda's TRANSIENT audio focus
+ * resumes by itself when the focus is abandoned, which covers the owner's
+ * actual spec (single tap = Deda off + music back).
  */
 class GlassesButtonService : Service() {
 
@@ -78,7 +81,6 @@ class GlassesButtonService : Service() {
     }
 
     private lateinit var audio: AudioManager
-    private lateinit var sessions: MediaSessionManager
     private var session: MediaSession? = null
     private val handler = Handler(Looper.getMainLooper())
 
@@ -91,23 +93,17 @@ class GlassesButtonService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var greeter: Greeter? = null
 
-    /** The music app we took the buttons from; single taps go back to it. */
-    private var lastOtherController: MediaController? = null
-    private val controllerCallbacks = HashMap<MediaController, MediaController.Callback>()
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        sessions = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
         greeter = Greeter(this)
         createChannel()
         startForeground(NOTIFICATION_ID, buildNotification(), foregroundTypes())
         startSession()
         applyActivationMode()
         audio.registerAudioPlaybackCallback(playbackCallback, handler)
-        watchOtherSessions()
         reclaimIfNobodyPlays("service start")
         // Phase 3: the wake-word state machine lives next to this service.
         DedaController.start(this)
@@ -125,7 +121,6 @@ class GlassesButtonService : Service() {
             quitCompletely()
             return START_NOT_STICKY
         }
-        if (!watchingOthers) watchOtherSessions() // access may have been granted since onCreate
         // Re-assert the foreground types: the RECORD_AUDIO permission may have
         // been granted since onCreate, which unlocks the microphone type.
         startForeground(NOTIFICATION_ID, buildNotification(), foregroundTypes())
@@ -154,9 +149,6 @@ class GlassesButtonService : Service() {
         scope.cancel()
         handler.removeCallbacksAndMessages(null)
         audio.unregisterAudioPlaybackCallback(playbackCallback)
-        try { sessions.removeOnActiveSessionsChangedListener(sessionsListener) } catch (_: Exception) {}
-        controllerCallbacks.forEach { (c, cb) -> c.unregisterCallback(cb) }
-        controllerCallbacks.clear()
         session?.let { it.isActive = false; it.release() }
         session = null
         greeter?.release()
@@ -232,9 +224,10 @@ class GlassesButtonService : Service() {
     //
     // We only own the buttons when NOTHING else is playing (we claim once with a
     // short silence and then sit reported as PAUSED, like a paused music app).
-    // In that window: double tap -> toggle Deda; single tap -> resume the last
-    // music app; triple -> previous. The reliable always-on control is the wake
-    // word ("Hej Deda") and the in-app / notification toggle.
+    // In that window: double tap -> toggle Deda; single tap while Deda is on ->
+    // Deda off, and music paused by Deda's transient focus resumes by itself.
+    // The reliable always-on control is the wake word ("Hej Deda") and the
+    // in-app / notification toggle.
 
     private val playbackCallback = object : AudioManager.AudioPlaybackCallback() {
         override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>) {
@@ -306,98 +299,26 @@ class GlassesButtonService : Service() {
 
     @Volatile private var silencePlaying = false
 
-    // ---- remembering the music app --------------------------------------------
-
-    private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { list ->
-        rememberOthers(list ?: emptyList())
-    }
-
-    private var watchingOthers = false
-
-    private fun watchOtherSessions() {
-        if (!DedaNotificationListener.isEnabled(this)) {
-            Log.w(TAG, "notification access not granted — single tap cannot be forwarded to the music app")
-            return
-        }
-        val cn = DedaNotificationListener.componentName(this)
-        try {
-            sessions.addOnActiveSessionsChangedListener(sessionsListener, cn, handler)
-            rememberOthers(sessions.getActiveSessions(cn))
-            watchingOthers = true
-            Log.d(TAG, "watching other media sessions")
-        } catch (e: SecurityException) {
-            Log.w(TAG, "getActiveSessions denied: ${e.message}")
-        }
-    }
-
-    private fun rememberOthers(list: List<MediaController>) {
-        val others = list.filter { it.packageName != packageName }
-        val gone = controllerCallbacks.keys.filter { k -> others.none { it.sessionToken == k.sessionToken } }
-        gone.forEach { c -> controllerCallbacks.remove(c)?.let { c.unregisterCallback(it) } }
-        // The list is ordered by priority: the most recent player comes first.
-        if (others.isNotEmpty()) {
-            val top = others.first()
-            if (lastOtherController?.sessionToken != top.sessionToken) {
-                lastOtherController = top
-                Log.d(TAG, "music app to hand single taps to: ${top.packageName}")
-            }
-        }
-        // Whoever starts PLAYING becomes the one we hand taps back to.
-        others.forEach { c ->
-            if (controllerCallbacks.keys.any { it.sessionToken == c.sessionToken }) return@forEach
-            val cb = object : MediaController.Callback() {
-                override fun onPlaybackStateChanged(state: PlaybackState?) {
-                    if (state?.state == PlaybackState.STATE_PLAYING &&
-                        lastOtherController?.sessionToken != c.sessionToken
-                    ) {
-                        lastOtherController = c
-                        Log.d(TAG, "now playing: ${c.packageName}")
-                    }
-                }
-            }
-            c.registerCallback(cb, handler)
-            controllerCallbacks[c] = cb
-        }
-    }
-
     private fun forwardPrevious() {
-        lastOtherController?.transportControls?.skipToPrevious()
-            ?: Log.d(TAG, "previous: no music app to forward to")
-    }
-
-    private fun forwardPlayPause() {
-        if (!watchingOthers) watchOtherSessions()
-        val target = lastOtherController
-        if (target == null) {
-            Log.d(TAG, "single tap: no music app to forward to")
-            return
-        }
-        val playing = target.playbackState?.state == PlaybackState.STATE_PLAYING
-        Log.d(TAG, "single tap -> ${target.packageName}: ${if (playing) "pause" else "play"}")
-        if (playing) target.transportControls.pause() else target.transportControls.play()
+        // Without notification access there is no MediaController to hand this
+        // to, and requesting that access hard-blocks the sideloaded install
+        // (Play Protect, 2026-08-20). While music plays the key is native.
+        Log.d(TAG, "previous: nothing to forward while nothing plays")
     }
 
     /**
      * Single tap. While Deda is on it means "back to my music" (owner spec):
-     * leave standby and make sure the music actually plays. Otherwise it is a
-     * plain play/pause handed to the last music app.
+     * leave standby — Deda held TRANSIENT audio focus, so whatever it paused
+     * resumes by itself the moment the focus is abandoned. While Deda is off
+     * the tap has nothing to control (music, when playing, owns the buttons
+     * natively and this callback never fires for it).
      */
     private fun handleSingleTap() {
         if (!DedaState.isOn()) {
-            forwardPlayPause()
+            Log.d(TAG, "single tap while idle — nothing to control")
             return
         }
         toggleStandby("single tap")
-        // DedaController returns the audio focus when Deda turns off; music we
-        // paused on entering standby resumes by itself. If nothing resumes —
-        // there was no music before standby — start the last known player.
-        handler.postDelayed({
-            val target = lastOtherController ?: return@postDelayed
-            if (target.playbackState?.state != PlaybackState.STATE_PLAYING) {
-                Log.d(TAG, "single tap: starting ${target.packageName} after standby exit")
-                target.transportControls.play()
-            }
-        }, 700)
     }
 
     // ---- Deda standby ---------------------------------------------------------

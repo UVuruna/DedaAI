@@ -22,7 +22,6 @@
         android:icon="@mipmap/ic_launcher"
         android:label="DedaAI"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.CameraAccess">
 
         <!-- Without Developer Mode, this key will need to be set with ID from app registered in Wearables Developer Center -->
@@ -73,16 +72,10 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback|microphone" />
 
-        <!-- Empty listener: only so MediaSessionManager.getActiveSessions() is
-             allowed, to hand single taps back to the music app -->
-        <service
-            android:name=".deda.DedaNotificationListener"
-            android:label="Deda"
-            android:exported="true"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
+        <!-- NO notification listener here, on purpose (2026-08-20): declaring
+             one made Google Play Protect hard-block the sideloaded install
+             ("sensitive data", no Install-anyway button). It only served
+             handing single taps back to the music app; music resume now rides
+             the transient audio-focus contract instead. -->
     </application>
 </manifest>

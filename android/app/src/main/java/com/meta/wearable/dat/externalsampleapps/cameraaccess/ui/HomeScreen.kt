@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaMode
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaNotificationListener
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.Greeter
@@ -150,23 +149,9 @@ fun HomeScreen(
             label = if (dedaMode == DedaMode.OFF) dedaTexts.switchOff else dedaTexts.switchOn,
             onClick = { viewModel.toggleDeda() },
         )
-        if (!DedaNotificationListener.isEnabled(context)) {
-          Text(
-              text = dedaTexts.notifAccessHint,
-              color = Color.Gray,
-              textAlign = TextAlign.Center,
-              modifier = Modifier.padding(horizontal = 24.dp),
-          )
-          SwitchButton(
-              label = dedaTexts.allowNotifAccess,
-              onClick = {
-                context.startActivity(
-                    android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
-              },
-          )
-        }
+        // No notification-access plea here anymore: the listener declaration
+        // made Play Protect hard-block the install (2026-08-20). Music resume
+        // rides the transient audio-focus contract instead.
 
         // Whole-app QUIT (owner's MVP item A): stops Deda's service outright;
         // the glasses fall back to a plain Bluetooth headset until the app is
