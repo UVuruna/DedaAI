@@ -20,7 +20,7 @@ android/build/
 android/app/build/
 android/local.properties
 android/app/src/main/java/**/Secrets.kt
-android/keystore/*.jks
+android/keystore/
 android/keystore/*.properties
 *.iml
 .idea/

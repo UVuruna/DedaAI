@@ -1,5 +1,5 @@
 # openWakeWord training config for the Serbian wake phrase "Hej Deda"
-# Run from u:\Coding\Meta RayBan AI\wakeword-training\ (all paths are relative to it).
+# Run from u:\Coding\UVuruna\Applications\DedaAI\wakeword-training\ (all paths are relative to it).
 # Based on openWakeWord/examples/custom_model.yml — see that file for full docs of every key.
 
 model_name: "hej_deda"

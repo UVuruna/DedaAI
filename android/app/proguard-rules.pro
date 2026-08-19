@@ -40,3 +40,13 @@
 
 # Readable crash stacks from a minified build.
 -keepattributes SourceFile,LineNumberTable
+
+# R8-generated missing-class suppressions (compile-only annotations and
+# Facebook infer stubs referenced by tink / DAT SDK internals; absent at
+# runtime by design). Source: app/build/outputs/mapping/release/missing_rules.txt
+-dontwarn com.facebook.common.preconditions.Preconditions
+-dontwarn com.facebook.common.stringformat.StringFormatUtil
+-dontwarn com.facebook.infer.annotation.Nullsafe
+-dontwarn com.facebook.infer.annotation.NullsafeStrict
+-dontwarn com.facebook.secure.sanitizer.intf.DataSanitizer
+-dontwarn com.google.errorprone.annotations.**

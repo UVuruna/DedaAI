@@ -19,9 +19,11 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# The RELEASE build (signed, shrunk) from the app that lives in this repo —
+# the old fork-checkout path died with the 2026-08-19 monorepo merge.
 APK_SRC = os.path.join(
-    HERE, '..', 'VisionClaw', 'samples', 'CameraAccessAndroid',
-    'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk')
+    HERE, '..', 'android',
+    'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk')
 REPO = 'UVuruna/DedaAI'
 STABLE_URL = 'https://github.com/%s/releases/latest/download/deda.apk' % REPO
 
