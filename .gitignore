@@ -1,5 +1,11 @@
 # --- agent tooling and the owner's inbox (never product history) ---
-.claude/
+# .claude/ is ignored by CONTENTS (`.claude/*`), not as a whole directory,
+# because a bare `.claude/` shadows every pattern below it — a `!` negation
+# on a path inside an ignored directory is then silently a no-op (verified
+# with `git check-ignore -v`). This is the same fix VibeCoder's and
+# Aviator's .gitignore already use for the identical problem.
+.claude/*
+!.claude/settings.json
 UV/
 _local/
 RENAME.md.done
