@@ -45,13 +45,23 @@ object SettingsManager {
         get() = prefs.getInt("dedaMaxSessionMin", 15)
         set(value) = prefs.edit().putInt("dedaMaxSessionMin", value.coerceIn(1, 120)).apply()
 
-    var geminiAPIKey: String
-        get() = prefs.getString("geminiAPIKey", null) ?: Secrets.geminiAPIKey
-        // Blank means "use the built-in default" — remove the override instead
-        // of storing an empty string that would break the fallback (pregled 8).
-        set(value) = prefs.edit().apply {
-            if (value.isBlank()) remove("geminiAPIKey") else putString("geminiAPIKey", value)
+    // ---- "user override with built-in fallback" prefs (pregled 8 + 9) ------
+    // Blank/absent override = the built-in default from Secrets is active.
+    // The setter removes the pref on blank instead of storing "" (an old ""
+    // from before this rule is also treated as absent by the getters, so no
+    // migration is needed).
+
+    private fun userOverride(key: String): String? =
+        prefs.getString(key, null)?.takeIf { it.isNotBlank() }
+
+    private fun setUserOverride(key: String, value: String) =
+        prefs.edit().apply {
+            if (value.isBlank()) remove(key) else putString(key, value)
         }.apply()
+
+    var geminiAPIKey: String
+        get() = userOverride("geminiAPIKey") ?: Secrets.geminiAPIKey
+        set(value) = setUserOverride("geminiAPIKey", value)
 
     /**
      * Only what the user typed — empty while the built-in default is active.
@@ -60,7 +70,7 @@ object SettingsManager {
      * (pregled 8).
      */
     val geminiAPIKeyUser: String
-        get() = prefs.getString("geminiAPIKey", null) ?: ""
+        get() = userOverride("geminiAPIKey") ?: ""
 
     /**
      * The language the assistant speaks. Runtime setting, not a build constant —
@@ -103,8 +113,12 @@ object SettingsManager {
     }
 
     var webrtcSignalingURL: String
-        get() = prefs.getString("webrtcSignalingURL", null) ?: Secrets.webrtcSignalingURL
-        set(value) = prefs.edit().putString("webrtcSignalingURL", value).apply()
+        get() = userOverride("webrtcSignalingURL") ?: Secrets.webrtcSignalingURL
+        set(value) = setUserOverride("webrtcSignalingURL", value)
+
+    /** Only what the user typed — empty while the built-in default is active. */
+    val webrtcSignalingURLUser: String
+        get() = userOverride("webrtcSignalingURL") ?: ""
 
     var videoFrameMode: VideoFrameMode
         get() = VideoFrameMode.fromName(prefs.getString("videoFrameMode", null))

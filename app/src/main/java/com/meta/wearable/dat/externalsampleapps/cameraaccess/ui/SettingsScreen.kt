@@ -59,7 +59,7 @@ fun SettingsScreen(
     var dedaActivation by remember { mutableStateOf(SettingsManager.dedaActivationMode) }
     var dedaSilenceSec by remember { mutableStateOf(SettingsManager.dedaSilenceTimeoutSec.toString()) }
     var dedaMaxMin by remember { mutableStateOf(SettingsManager.dedaMaxSessionMin.toString()) }
-    var webrtcSignalingURL by remember { mutableStateOf(SettingsManager.webrtcSignalingURL) }
+    var webrtcSignalingURL by remember { mutableStateOf(SettingsManager.webrtcSignalingURLUser) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     fun save() {
@@ -84,7 +84,7 @@ fun SettingsScreen(
         dedaActivation = SettingsManager.dedaActivationMode
         dedaSilenceSec = SettingsManager.dedaSilenceTimeoutSec.toString()
         dedaMaxMin = SettingsManager.dedaMaxSessionMin.toString()
-        webrtcSignalingURL = SettingsManager.webrtcSignalingURL
+        webrtcSignalingURL = SettingsManager.webrtcSignalingURLUser
     }
 
     // Switching language rewrites the prompt in the box, unless the user has
@@ -96,21 +96,19 @@ fun SettingsScreen(
         systemPrompt = SettingsManager.geminiSystemPrompt
     }
 
-    // The system back gesture must behave exactly like the arrow — before
-    // this, swiping back silently discarded everything typed (pregled 8).
-    BackHandler {
+    // One exit path for the arrow AND the system back gesture — two copies
+    // is exactly how the gesture was forgotten the first time (pregled 9).
+    val exitAndSave = {
         save()
         onBack()
     }
+    BackHandler { exitAndSave() }
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Settings") },
             navigationIcon = {
-                IconButton(onClick = {
-                    save()
-                    onBack()
-                }) {
+                IconButton(onClick = { exitAndSave() }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
             },
