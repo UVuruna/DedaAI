@@ -27,8 +27,8 @@ ili skeniraj telefonom:
 3. Pri prvom pokretanju odobri tražene dozvole (mikrofon, obaveštenja).
 4. U Settings (zupčanik gore desno) nalepi **svoj** Gemini API ključ —
    besplatan na [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-   (prijava Google nalogom, bez kartice) — i izaberi jezik. PLACEHOLDER
-   nazad u vrhu ekrana** da se sačuva.
+   (prijava Google nalogom, bez kartice) — i izaberi jezik. Kad izađeš nazad
+   (strelicom ili prevlačenjem), unos se sačuva.
 5. Proveri bez naočara: na početnom ekranu **Start on Phone** i postavi
    pitanje naglas — ako odgovori, ključ i jezik rade.
 6. Za naočare: u **Meta AI** aplikaciji uključi **Developer Mode** — na
