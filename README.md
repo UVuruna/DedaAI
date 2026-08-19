@@ -15,8 +15,8 @@ kroz instalaciju i preuzimanje:
 ![QR kod](qr.png)
 
 Vodiči (slike, SR / SL / EN):
-- **[Instalacija aplikacije → install.html](install.html)**
-- **[Kako napraviti Google ključ → vodic.html](vodic.html)**
+- **[Instalacija aplikacije → install.html](https://uvuruna.github.io/DedaAI/install.html)**
+- **[Kako napraviti Google ključ → vodic.html](https://uvuruna.github.io/DedaAI/vodic.html)**
 
 Direktan link za APK: [deda.apk](https://github.com/UVuruna/DedaAI/releases/latest/download/deda.apk)
 
