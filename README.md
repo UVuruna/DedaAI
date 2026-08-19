@@ -1,5 +1,13 @@
 # DedaAI
 
+<div align="center">
+
+## [⬇ &nbsp;DOWNLOAD deda.apk (17 MB)](https://github.com/UVuruna/DedaAI/releases/latest/download/deda.apk)
+
+**[📲 Uputstvo / Install guide / Navodila →](https://uvuruna.github.io/DedaAI/)** <!-- lang-ok: trilingual download row, customer-facing -->
+
+</div>
+
 A voice assistant for Ray-Ban Meta smart glasses: look at something, say "Hej
 Deda", ask your question, and get a spoken answer back through the glasses —
 powered by Gemini Live, with your own free API key. Android app, sr/sl/en.
