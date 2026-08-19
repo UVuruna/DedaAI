@@ -124,6 +124,19 @@ object SettingsManager {
         get() = VideoFrameMode.fromName(prefs.getString("videoFrameMode", null))
         set(value) = prefs.edit().putString("videoFrameMode", value.name).apply()
 
+    /**
+     * The one rule for whether a Deda conversation may stream the glasses
+     * camera: only when the conversation audio does NOT ride the glasses'
+     * headset link (streaming there mutes it — owner's phone, 2026-08-19)
+     * and the camera is not OFF. Single source of truth for DedaController
+     * (the gate) and SettingsScreen (the hint preview) — pregled 13.
+     */
+    fun cameraStreamsInConversation(glassesMic: Boolean, mode: VideoFrameMode): Boolean =
+        !glassesMic && mode != VideoFrameMode.OFF
+
+    val cameraStreamsInConversation: Boolean
+        get() = cameraStreamsInConversation(glassesMicEnabled, videoFrameMode)
+
     fun resetAll() {
         prefs.edit().clear().apply()
     }

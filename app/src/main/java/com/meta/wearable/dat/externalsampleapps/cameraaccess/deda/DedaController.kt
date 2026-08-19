@@ -9,7 +9,6 @@ import android.os.Looper
 import android.util.Log
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiSession
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.VideoFrameMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.HeadsetRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -99,8 +98,7 @@ object DedaController {
                 // proven on hardware. Until it is, glasses-mic conversations
                 // run audio-only and the system prompt has the model admit it
                 // cannot see, instead of killing the voice link.
-                val eyes = !SettingsManager.glassesMicEnabled &&
-                    SettingsManager.videoFrameMode != VideoFrameMode.OFF
+                val eyes = SettingsManager.cameraStreamsInConversation
                 if (eyes) {
                     appContext?.let { TalkVision.start(it) }
                 } else {
