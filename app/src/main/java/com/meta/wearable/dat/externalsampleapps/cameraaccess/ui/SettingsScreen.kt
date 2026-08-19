@@ -1,5 +1,6 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,7 +49,9 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var geminiAPIKey by remember { mutableStateOf(SettingsManager.geminiAPIKey) }
+    // The user's own key only — the built-in default must never be shown
+    // as if it were theirs (public APK, pregled 8). Empty = default active.
+    var geminiAPIKey by remember { mutableStateOf(SettingsManager.geminiAPIKeyUser) }
     var language by remember { mutableStateOf(SettingsManager.assistantLanguage) }
     var systemPrompt by remember { mutableStateOf(SettingsManager.geminiSystemPrompt) }
     var videoFrameMode by remember { mutableStateOf(SettingsManager.videoFrameMode) }
@@ -67,12 +70,13 @@ fun SettingsScreen(
         SettingsManager.dedaActivationMode = dedaActivation
         dedaSilenceSec.toIntOrNull()?.let { SettingsManager.dedaSilenceTimeoutSec = it }
         dedaMaxMin.toIntOrNull()?.let { SettingsManager.dedaMaxSessionMin = it }
+        SettingsManager.webrtcSignalingURL = webrtcSignalingURL.trim()
         // The always-on service re-reads the activation mode on every start.
         GlassesButtonService.start(context)
     }
 
     fun reload() {
-        geminiAPIKey = SettingsManager.geminiAPIKey
+        geminiAPIKey = SettingsManager.geminiAPIKeyUser
         language = SettingsManager.assistantLanguage
         systemPrompt = SettingsManager.geminiSystemPrompt
         videoFrameMode = SettingsManager.videoFrameMode
@@ -90,6 +94,13 @@ fun SettingsScreen(
         SettingsManager.assistantLanguage = next
         language = next
         systemPrompt = SettingsManager.geminiSystemPrompt
+    }
+
+    // The system back gesture must behave exactly like the arrow — before
+    // this, swiping back silently discarded everything typed (pregled 8).
+    BackHandler {
+        save()
+        onBack()
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -120,7 +131,7 @@ fun SettingsScreen(
                 label = "API Key",
                 placeholder = "Enter Gemini API key",
             )
-            Hint("Free key from aistudio.google.com/apikey. No card required.")
+            Hint("Empty = the app's built-in default key. Paste your own free key from aistudio.google.com/apikey (no card required).")
 
             SectionHeader("Language")
             ChipRow(

@@ -47,7 +47,20 @@ object SettingsManager {
 
     var geminiAPIKey: String
         get() = prefs.getString("geminiAPIKey", null) ?: Secrets.geminiAPIKey
-        set(value) = prefs.edit().putString("geminiAPIKey", value).apply()
+        // Blank means "use the built-in default" — remove the override instead
+        // of storing an empty string that would break the fallback (pregled 8).
+        set(value) = prefs.edit().apply {
+            if (value.isBlank()) remove("geminiAPIKey") else putString("geminiAPIKey", value)
+        }.apply()
+
+    /**
+     * Only what the user typed — empty while the built-in default is active.
+     * The Settings field shows this, never the built-in key: a public APK
+     * must not display the owner's key as if it were the user's own
+     * (pregled 8).
+     */
+    val geminiAPIKeyUser: String
+        get() = prefs.getString("geminiAPIKey", null) ?: ""
 
     /**
      * The language the assistant speaks. Runtime setting, not a build constant —
