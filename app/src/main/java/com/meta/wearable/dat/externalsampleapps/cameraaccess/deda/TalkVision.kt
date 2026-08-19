@@ -106,6 +106,12 @@ object TalkVision {
      * Calls [onDone] exactly once, on the main thread, with the frame or
      * null (no glasses, timeout, any failure, or the continuous stream
      * already owning the camera) — the caller proceeds audio-only on null.
+     *
+     * [timeoutMs] must stay BELOW the 5 s floor of dedaSilenceTimeoutSec
+     * (SettingsManager coerceIn): the capture runs inside TALKING before the
+     * session opens, and a silence-timer expiry mid-capture would close a
+     * conversation that never got to start (pregled 15, finding 3 — endTalk
+     * now survives that too, but by ending the conversation).
      */
     fun captureOnce(context: Context, timeoutMs: Long = 2_500L, onDone: (Bitmap?) -> Unit) {
         if (session != null) {
@@ -114,9 +120,10 @@ object TalkVision {
             onDone(null)
             return
         }
+        val appCtx = context.applicationContext
         val opened = try {
             Wearables.startStreamSession(
-                context.applicationContext,
+                appCtx,
                 AutoDeviceSelector(),
                 StreamConfiguration(videoQuality = VideoQuality.HIGH, 24),
             )
@@ -125,6 +132,10 @@ object TalkVision {
             onDone(null)
             return
         }
+        // Wake usually happens with the phone locked in a pocket — without
+        // the connectedDevice foreground service the stream can die before
+        // the first frame arrives (pregled 15, hardware caveat).
+        StreamingService.start(appCtx, "talk-vision-once")
         var done = false
         // Main-thread only (both callers land here via Dispatchers.Main), so
         // the flag needs no lock and onDone cannot run twice.
@@ -136,6 +147,7 @@ object TalkVision {
                 } catch (e: Exception) {
                     Log.w(TAG, "one-shot: stream close failed: ${e.message}")
                 }
+                StreamingService.stop(appCtx, "talk-vision-once")
                 Log.d(TAG, "one-shot picture ${if (bmp != null) "captured" else "NOT captured"}")
                 onDone(bmp)
             }

@@ -234,6 +234,11 @@ object GeminiSession {
         provider.disconnect()
         stateObservationJob?.cancel()
         stateObservationJob = null
+        // A held frame (including a preloaded one-shot picture) must die with
+        // the session, or conversation N's scene gets attached to a question
+        // in conversation N+1 (pregled 15, bug 1).
+        latestFrame = null
+        lastFrameSentAt = 0
         _uiState.value = _uiState.value.copy(
             isGeminiActive = false,
             connectionState = AiConnectionState.Disconnected,

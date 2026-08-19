@@ -52,6 +52,14 @@ object DedaController {
     private var transcriptTail = ""
     private var lastActivityAt = 0L
 
+    /**
+     * Bumped on every wake. A one-shot capture callback from conversation N
+     * must not open (or feed a picture into) conversation N+1 started within
+     * the ~2.5 s capture window — the mode guard alone cannot tell the two
+     * TALKINGs apart (pregled 15, race 2).
+     */
+    private var wakeGeneration = 0
+
     /** Idempotent; called once from GlassesButtonService.onCreate. */
     fun start(context: Context) {
         if (started) return
@@ -138,10 +146,14 @@ object DedaController {
         val oneShotPicture = ctx != null &&
             SettingsManager.glassesMicEnabled &&
             SettingsManager.videoFrameMode == VideoFrameMode.ON_QUESTION
+        val gen = ++wakeGeneration
         if (oneShotPicture) {
             TalkVision.captureOnce(ctx!!) { picture ->
-                // The user may have tapped out during the ~2 s capture.
-                if (DedaState.mode.value != DedaMode.TALKING) return@captureOnce
+                // Stale if the user tapped out during the ~2 s capture, or if
+                // a whole new conversation started meanwhile (generation).
+                if (gen != wakeGeneration || DedaState.mode.value != DedaMode.TALKING) {
+                    return@captureOnce
+                }
                 if (picture != null) GeminiSession.preloadFrame(picture)
                 openSession()
             }
@@ -153,6 +165,10 @@ object DedaController {
     /** The audio half of opening a conversation; mode is already TALKING. */
     private fun openSession() {
         if (DedaState.mode.value != DedaMode.TALKING) return
+        // The silence window must start from HERE, not from the TALKING entry
+        // — a one-shot capture already ate ~2.5 s of it, and nothing ties the
+        // capture timeout to the minimum silence setting (pregled 15).
+        lastActivityAt = System.currentTimeMillis()
         GeminiSession.startSession()
         if (!GeminiSession.uiState.value.isGeminiActive) {
             // Refused synchronously (no API key). Back to standby, sad chime.
@@ -203,7 +219,18 @@ object DedaController {
         if (DedaState.mode.value != DedaMode.TALKING) return
         Log.d(TAG, "closing session: $reason")
         handler.postDelayed(talkingExitWatchdog, TALKING_EXIT_WATCHDOG_MS)
+        val wasActive = GeminiSession.uiState.value.isGeminiActive
         GeminiSession.stopSession(reason) // fires onSessionEnded -> STANDBY
+        if (!wasActive) {
+            // Nothing was active to end — TALKING with no session happens
+            // only while a one-shot capture is still in flight. stopSession
+            // fires no onSessionEnded for an inactive session, so leave by
+            // hand or the mode would stay TALKING forever (pregled 15,
+            // finding 3). The capture callback's mode guard then discards
+            // the stale capture.
+            greeter?.chime(false)
+            DedaState.set(DedaMode.STANDBY)
+        }
     }
 
     // ---- wake listening ------------------------------------------------------
