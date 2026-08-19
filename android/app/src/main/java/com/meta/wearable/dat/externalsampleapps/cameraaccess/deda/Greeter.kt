@@ -54,6 +54,7 @@ class Greeter(context: Context) {
         val switchOff: String,
         val notifAccessHint: String,
         val allowNotifAccess: String,
+        val quitApp: String,
     ) {
         companion object {
             fun forCurrentLanguage(): Texts {
@@ -76,6 +77,7 @@ class Greeter(context: Context) {
                     switchOff = ctx.getString(R.string.deda_switch_off),
                     notifAccessHint = ctx.getString(R.string.deda_notif_access_hint),
                     allowNotifAccess = ctx.getString(R.string.deda_allow_notif_access),
+                    quitApp = ctx.getString(R.string.deda_quit_app),
                 )
             }
         }

@@ -18,7 +18,7 @@
     <string name="live_stream" description="Live Stream">Live stream</string>
 
     <!-- Non Stream Screen -->
-    <string name="camera_access_icon_description" description="Camera Access icon description">Camera Access icon</string>
+    <string name="camera_access_icon_description" description="App icon description">DedaAI icon</string>
     <string name="non_stream_screen_description" description="Non stream screen description">Tap the Start streaming button to stream video from your glasses or use the camera button to take a photo from your glasses.</string>
     <string name="non_stream_screen_title" description="Non stream screen title">Stream Your Glasses Camera</string>
     <string name="waiting_for_active_device" description="Waiting for active device message">Waiting for an active device</string>
@@ -51,7 +51,7 @@
     <!-- Deda (assistant) — sr/sl translations live in values-sr/ and values-sl/;
          resolved against the in-app assistant language via Greeter.Texts, not the system locale -->
     <string name="deda_listening" description="Spoken + shown when standby turns on">Deda is listening</string>
-    <string name="deda_not_listening" description="Spoken + shown when standby turns off">Deda is not listening anymore</string>
+    <string name="deda_not_listening" description="Spoken + shown when standby turns off">Deda is gone</string>
     <string name="deda_sleeping" description="Notification title while off">Deda is asleep</string>
     <string name="deda_talking" description="Notification title during a conversation">Deda is talking</string>
     <string name="deda_double_tap_to_start" description="Notification hint while off, tap mode">Double-tap the glasses to turn on</string>
@@ -64,10 +64,11 @@
     <string name="deda_switch_on" description="Home screen switch while on">Deda: listening — turn off</string>
     <string name="deda_notif_access_hint" description="Why notification access is needed">For single tap to keep controlling music, allow Deda notification access.</string>
     <string name="deda_allow_notif_access" description="Button opening notification access settings">Allow notification access</string>
+    <string name="deda_quit_app" description="Notification action + home button: quit the whole app">Quit the app</string>
 
     <!-- Getting Started Sheet -->
     <string name="getting_started_title" description="Getting Started sheet title">Getting started</string>
-    <string name="getting_started_tip_permission" description="Tip about camera permission">First, Camera Access needs permission to use your glasses camera.</string>
+    <string name="getting_started_tip_permission" description="Tip about camera permission">First, DedaAI needs permission to use your glasses camera.</string>
     <string name="getting_started_tip_led" description="Tip about capture LED">The capture LED lets others know when you\'re capturing content or going live.</string>
     <string name="getting_started_tip_photo" description="Tip about photo capture">Capture photos by tapping the camera button.</string>
     <string name="getting_started_continue" description="Continue button">Continue</string>

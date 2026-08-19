@@ -23,9 +23,9 @@ class StreamingService : Service() {
   companion object {
     private const val TAG = "StreamingService"
     private const val CHANNEL_ID = "streaming_channel"
-    private const val CHANNEL_NAME = "Camera Streaming"
+    private const val CHANNEL_NAME = "DedaAI camera"
     private const val NOTIFICATION_ID = 1001
-    private const val WAKELOCK_TAG = "VisionClaw::StreamingWakeLock"
+    private const val WAKELOCK_TAG = "DedaAI::StreamingWakeLock"
 
     /**
      * Both the stream screen and a Deda conversation (TalkVision) keep this
@@ -93,7 +93,7 @@ class StreamingService : Service() {
       ServiceNotifications.builder(
               this,
               CHANNEL_ID,
-              title = "Camera Streaming",
+              title = "DedaAI",
               text = "Streaming from your glasses...",
           )
           .build()

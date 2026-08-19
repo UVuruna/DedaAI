@@ -57,6 +57,13 @@ object GeminiSession {
     /** Fires once whenever an active session ends, for any reason (null = asked to stop). */
     var onSessionEnded: ((reason: String?) -> Unit)? = null
 
+    /**
+     * The model called the end_conversation tool — the user said the farewell
+     * phrase (or clearly asked to stop). The transcript match in
+     * DedaController stays as the fallback path (belt and suspenders).
+     */
+    var onEndConversation: (() -> Unit)? = null
+
     val isModelSpeaking: Boolean
         get() = provider.isModelSpeaking.value
 
@@ -106,12 +113,25 @@ object GeminiSession {
             )
         }
 
+        provider.onToolCall = { name ->
+            if (name == "end_conversation") onEndConversation?.invoke()
+        }
+
         provider.onDisconnected = { reason ->
             if (_uiState.value.isGeminiActive) {
+                // A server-side close (goAway / Google's own session limit) is
+                // a NORMAL end of conversation — farewell + standby arrive via
+                // onSessionEnded — not a failure; the error banner is reserved
+                // for real failures (owner's MVP item C).
+                val serverClose = reason != null &&
+                    (reason.startsWith(GeminiLiveService.REASON_SERVER_CLOSING) ||
+                        reason.startsWith(GeminiLiveService.REASON_CONNECTION_CLOSED))
                 stopSession(reason ?: "Unknown error")
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = "Connection lost: ${reason ?: "Unknown error"}"
-                )
+                if (!serverClose) {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = "Connection lost: ${reason ?: "Unknown error"}"
+                    )
+                }
             }
         }
 
@@ -194,7 +214,22 @@ object GeminiSession {
      * frame cannot leak into a later session because stopSession clears it.
      */
     fun preloadFrame(bitmap: Bitmap) {
-        latestFrame = bitmap
+        // A one-shot picture is now a REAL still (full resolution, item B) —
+        // ~4x the pixels of the old video-frame path. Cap the longest edge so
+        // one preloaded photo cannot balloon the WebSocket send; smaller
+        // pictures pass through unscaled.
+        val longest = maxOf(bitmap.width, bitmap.height)
+        latestFrame = if (longest <= GeminiConfig.PHOTO_MAX_SEND_EDGE) {
+            bitmap
+        } else {
+            val scale = GeminiConfig.PHOTO_MAX_SEND_EDGE.toFloat() / longest
+            Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).toInt(),
+                (bitmap.height * scale).toInt(),
+                true,
+            )
+        }
     }
 
     /**

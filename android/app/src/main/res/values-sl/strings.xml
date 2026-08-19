@@ -2,7 +2,7 @@
 <resources>
     <!-- lang-ok-begin: Slovenian translation file (values-sl) — user-facing strings for the assistant language -->
     <string name="deda_listening">Deda posluša</string>
-    <string name="deda_not_listening">Deda ne posluša več</string>
+    <string name="deda_not_listening">Deda je odšel</string>
     <string name="deda_sleeping">Deda spi</string>
     <string name="deda_talking">Deda se pogovarja</string>
     <string name="deda_double_tap_to_start">Dvojni dotik na očalih: vklopi</string>
@@ -15,5 +15,6 @@
     <string name="deda_switch_on">Deda: posluša — izklopi</string>
     <string name="deda_notif_access_hint">Da en dotik še naprej upravlja glasbo, dovoli Dedi dostop do obvestil.</string>
     <string name="deda_allow_notif_access">Dovoli dostop do obvestil</string>
+    <string name="deda_quit_app">Zapri aplikacijo</string>
     <!-- lang-ok-end -->
 </resources>

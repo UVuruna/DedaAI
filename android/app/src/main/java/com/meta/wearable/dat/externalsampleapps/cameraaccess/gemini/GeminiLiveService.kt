@@ -32,6 +32,15 @@ typealias GeminiConnectionState = AiConnectionState
 class GeminiLiveService : AiProvider {
     companion object {
         private const val TAG = "GeminiLiveService"
+
+        /**
+         * Reason prefixes for a server-initiated close (goAway or a close
+         * frame). Google ending the session itself — e.g. its own free-tier
+         * session limit — is a NORMAL end of a conversation, not a failure;
+         * GeminiSession matches on these to skip the error banner.
+         */
+        const val REASON_SERVER_CLOSING = "Server closing"
+        const val REASON_CONNECTION_CLOSED = "Connection closed"
     }
 
     private val _connectionState = MutableStateFlow<AiConnectionState>(AiConnectionState.Disconnected)
@@ -46,6 +55,7 @@ class GeminiLiveService : AiProvider {
     override var onDisconnected: ((String?) -> Unit)? = null
     override var onInputTranscription: ((String) -> Unit)? = null
     override var onOutputTranscription: ((String) -> Unit)? = null
+    override var onToolCall: ((String) -> Unit)? = null
 
     override val inputSampleRate: Int = GeminiConfig.INPUT_AUDIO_SAMPLE_RATE
     override val outputSampleRate: Int = GeminiConfig.OUTPUT_AUDIO_SAMPLE_RATE
@@ -105,7 +115,7 @@ class GeminiLiveService : AiProvider {
                 _connectionState.value = AiConnectionState.Disconnected
                 _isModelSpeaking.value = false
                 resolveConnect(false)
-                onDisconnected?.invoke("Connection closed (code $code: $reason)")
+                onDisconnected?.invoke("$REASON_CONNECTION_CLOSED (code $code: $reason)")
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -224,6 +234,21 @@ class GeminiLiveService : AiProvider {
                         put("text", GeminiConfig.systemInstruction)
                     }))
                 })
+                // The one declared tool: the model itself ends the talk on the
+                // farewell phrase — the transcript match sometimes never sees
+                // the phrase (missing or translated transcription), this does.
+                put("tools", JSONArray().put(JSONObject().apply {
+                    put("functionDeclarations", JSONArray().put(JSONObject().apply {
+                        put("name", "end_conversation")
+                        put(
+                            "description",
+                            "End the current voice conversation immediately. Call this " +
+                                "the moment the user says the farewell phrase (Cao Deda / " +
+                                "Ciao Deda / Chao Deda in any language) or clearly asks " +
+                                "to stop talking.",
+                        )
+                    }))
+                }))
                 put("realtimeInputConfig", JSONObject().apply {
                     put("automaticActivityDetection", JSONObject().apply {
                         put("disabled", false)
@@ -265,7 +290,35 @@ class GeminiLiveService : AiProvider {
                 val seconds = goAway.optJSONObject("timeLeft")?.optInt("seconds", 0) ?: 0
                 _connectionState.value = AiConnectionState.Disconnected
                 _isModelSpeaking.value = false
-                onDisconnected?.invoke("Server closing (time left: ${seconds}s)")
+                onDisconnected?.invoke("$REASON_SERVER_CLOSING (time left: ${seconds}s)")
+                return
+            }
+
+            // Tool call (the declared end_conversation). Acknowledge FIRST —
+            // the model waits for the function response — then tell the app.
+            if (json.has("toolCall")) {
+                val calls = json.getJSONObject("toolCall").optJSONArray("functionCalls")
+                if (calls != null) {
+                    for (i in 0 until calls.length()) {
+                        val call = calls.getJSONObject(i)
+                        val id = call.optString("id", "")
+                        val name = call.optString("name", "")
+                        val response = JSONObject().apply {
+                            put("toolResponse", JSONObject().apply {
+                                put("functionResponses", JSONArray().put(JSONObject().apply {
+                                    put("id", id)
+                                    put("name", name)
+                                    put("response", JSONObject().put("output", "ok"))
+                                }))
+                            })
+                        }
+                        // Direct send like the setup message; webSocket.send
+                        // is thread-safe.
+                        webSocket?.send(response.toString())
+                        Log.d(TAG, "Tool call handled: $name")
+                        onToolCall?.invoke(name)
+                    }
+                }
                 return
             }
 

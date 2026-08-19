@@ -49,6 +49,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaNotificationListener
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaState
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.Greeter
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
@@ -166,6 +167,15 @@ fun HomeScreen(
               },
           )
         }
+
+        // Whole-app QUIT (owner's MVP item A): stops Deda's service outright;
+        // the glasses fall back to a plain Bluetooth headset until the app is
+        // opened again.
+        SwitchButton(
+            label = dedaTexts.quitApp,
+            onClick = { GlassesButtonService.quit(context) },
+            isDestructive = true,
+        )
       }
     }
   }

@@ -25,3 +25,18 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ---- DedaAI release rules -------------------------------------------------
+# NOTE: this R8 config is UNVERIFIED until assembleRelease runs — builds
+# happen only on the owner's word (BUILD.md).
+
+# Meta DAT SDK: its reflection/JNI surface is undocumented — keep it whole.
+-keep class com.meta.wearable.** { *; }
+-dontwarn com.meta.wearable.**
+
+# okhttp/okio reference optional platform integrations (Conscrypt etc.).
+-dontwarn okhttp3.**
+-dontwarn okio.**
+
+# Readable crash stacks from a minified build.
+-keepattributes SourceFile,LineNumberTable

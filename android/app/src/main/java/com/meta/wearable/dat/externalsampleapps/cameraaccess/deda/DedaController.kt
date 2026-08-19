@@ -28,9 +28,12 @@ import kotlinx.coroutines.launch
  * exit lets the paused music resume by itself.
  *
  * In STANDBY the wake-word listener runs on the glasses mic (HeadsetRoute).
- * The start phrase opens a Gemini session (TALKING); the stop phrase — read
- * from what Gemini itself heard, no second microphone — closes it, as do the
- * silence timer and the hard session cap (both adjustable in Settings).
+ * The start phrase opens a Gemini session (TALKING); the stop phrase closes
+ * it — reported by the model itself through the end_conversation tool, with
+ * the transcript match kept as the fallback — as does the silence timer
+ * (adjustable in Settings). There is no forced session cap (owner decree
+ * 2026-08-19): when Google's own session limit closes the socket, that is a
+ * normal end too — farewell and back to standby.
  */
 object DedaController {
     private const val TAG = "DedaController"
@@ -55,7 +58,7 @@ object DedaController {
     /**
      * Bumped on every wake. A one-shot capture callback from conversation N
      * must not open (or feed a picture into) conversation N+1 started within
-     * the ~2.5 s capture window — the mode guard alone cannot tell the two
+     * the ~4 s capture window — the mode guard alone cannot tell the two
      * TALKINGs apart (pregled 15, race 2).
      */
     private var wakeGeneration = 0
@@ -67,6 +70,10 @@ object DedaController {
         appContext = context.applicationContext
         greeter = Greeter(context.applicationContext)
         GeminiSession.onUserTranscript = { text -> handler.post { onTranscript(text) } }
+        // The model itself reports the farewell phrase through the declared
+        // end_conversation tool — the reliable stop path; the transcript match
+        // in onTranscript stays as the fallback (belt and suspenders).
+        GeminiSession.onEndConversation = { handler.post { endTalk("end_conversation tool") } }
         GeminiSession.onSessionEnded = { reason -> handler.post { onSessionEnded(reason) } }
         scope.launch { DedaState.mode.collect { onMode(it) } }
         Log.d(TAG, "started")
@@ -149,7 +156,7 @@ object DedaController {
         val gen = ++wakeGeneration
         if (oneShotPicture) {
             TalkVision.captureOnce(ctx!!) { picture ->
-                // Stale if the user tapped out during the ~2 s capture, or if
+                // Stale if the user tapped out during the ~4 s capture, or if
                 // a whole new conversation started meanwhile (generation).
                 if (gen != wakeGeneration || DedaState.mode.value != DedaMode.TALKING) {
                     return@captureOnce
@@ -165,9 +172,21 @@ object DedaController {
     /** The audio half of opening a conversation; mode is already TALKING. */
     private fun openSession() {
         if (DedaState.mode.value != DedaMode.TALKING) return
+        if (GeminiSession.uiState.value.isGeminiActive) {
+            // A session someone else opened (e.g. the stream screen) slipped
+            // in during the ~4 s one-shot capture window (T80). Do not adopt
+            // it: Deda's timers must not manage a foreign session. Drop the
+            // wake attempt — and the preloaded picture, which must not leak
+            // into that session — and go back to standby.
+            Log.w(TAG, "a foreign session opened during the capture window — not adopting it")
+            GeminiSession.clearHeldFrame()
+            greeter?.chime(false)
+            DedaState.set(DedaMode.STANDBY)
+            return
+        }
         // The silence window must start from HERE, not from the TALKING entry
-        // — a one-shot capture already ate ~2.5 s of it, and nothing ties the
-        // capture timeout to the minimum silence setting (pregled 15).
+        // — a one-shot capture may already have eaten ~4 s of it, and nothing
+        // ties the capture timeout to the minimum silence setting (pregled 15).
         lastActivityAt = System.currentTimeMillis()
         GeminiSession.startSession()
         if (!GeminiSession.uiState.value.isGeminiActive) {
@@ -277,18 +296,19 @@ object DedaController {
         }
     }
 
-    private val hardStop = Runnable { endTalk("max session length") }
+    // No forced session cap here on purpose (owner decree 2026-08-19): a
+    // conversation ends ONLY by the stop phrase, the silence timer above, or
+    // Google's own session limit — which arrives as a server-side close and
+    // is handled as a normal end (farewell + standby).
 
     private fun startTimers() {
         transcriptTail = ""
         lastActivityAt = System.currentTimeMillis()
         handler.postDelayed(silenceTick, 1000)
-        handler.postDelayed(hardStop, SettingsManager.dedaMaxSessionMin * 60_000L)
     }
 
     private fun stopTimers() {
         handler.removeCallbacks(silenceTick)
-        handler.removeCallbacks(hardStop)
         handler.removeCallbacks(connectWatchdog)
         handler.removeCallbacks(talkingExitWatchdog)
     }

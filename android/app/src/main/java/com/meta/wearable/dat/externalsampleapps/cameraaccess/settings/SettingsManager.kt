@@ -6,7 +6,9 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.Secrets
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.assistant.AssistantLanguage
 
 object SettingsManager {
-    private const val PREFS_NAME = "visionclaw_settings"
+    // Free rename (2026-08-19): the new applicationId makes DedaAI a fresh
+    // install, so there are no old prefs to migrate.
+    private const val PREFS_NAME = "dedaai_settings"
 
     private lateinit var prefs: SharedPreferences
 
@@ -40,10 +42,9 @@ object SettingsManager {
         get() = prefs.getInt("dedaSilenceTimeoutSec", 15)
         set(value) = prefs.edit().putInt("dedaSilenceTimeoutSec", value.coerceIn(5, 600)).apply()
 
-    /** A conversation is force-closed after this many minutes, no matter what. */
-    var dedaMaxSessionMin: Int
-        get() = prefs.getInt("dedaMaxSessionMin", 15)
-        set(value) = prefs.edit().putInt("dedaMaxSessionMin", value.coerceIn(1, 120)).apply()
+    // dedaMaxSessionMin (the forced session cap) was removed on purpose: a
+    // conversation ends ONLY by the stop phrase, the silence timeout above,
+    // or Google's own session limit (owner decree 2026-08-19).
 
     // ---- "user override with built-in fallback" prefs (pregled 8 + 9) ------
     // Blank/absent override = the built-in default from Secrets is active.
@@ -111,14 +112,6 @@ object SettingsManager {
     fun clearSystemPromptOverride() {
         prefs.edit().remove("geminiSystemPrompt").apply()
     }
-
-    var webrtcSignalingURL: String
-        get() = userOverride("webrtcSignalingURL") ?: Secrets.webrtcSignalingURL
-        set(value) = setUserOverride("webrtcSignalingURL", value)
-
-    /** Only what the user typed — empty while the built-in default is active. */
-    val webrtcSignalingURLUser: String
-        get() = userOverride("webrtcSignalingURL") ?: ""
 
     var videoFrameMode: VideoFrameMode
         get() = VideoFrameMode.fromName(prefs.getString("videoFrameMode", null))

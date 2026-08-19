@@ -46,6 +46,14 @@ interface AiProvider {
     /** Incremental transcript of what the backend answered. */
     var onOutputTranscription: ((String) -> Unit)?
 
+    /**
+     * The backend invoked one of the function tools declared at setup; the
+     * argument is the tool name. The transport acknowledges the call itself —
+     * this only tells the app to act. Today the single declared tool is
+     * end_conversation.
+     */
+    var onToolCall: ((String) -> Unit)?
+
     /** PCM16 sample rate this provider expects on [sendAudio]. */
     val inputSampleRate: Int
 

@@ -14,9 +14,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,7 +38,6 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiSessio
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.StreamViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.StreamingMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.webrtc.WebRTCSessionViewModel
 
 @Composable
 fun StreamScreen(
@@ -56,22 +53,15 @@ fun StreamScreen(
                 ),
         ),
     geminiViewModel: GeminiSessionViewModel = viewModel(),
-    webrtcViewModel: WebRTCSessionViewModel = viewModel(),
 ) {
     val streamUiState by streamViewModel.uiState.collectAsStateWithLifecycle()
     val geminiUiState by geminiViewModel.uiState.collectAsStateWithLifecycle()
-    val webrtcUiState by webrtcViewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
 
     // Wire Gemini VM to Stream VM for frame forwarding
     LaunchedEffect(geminiViewModel) {
         streamViewModel.geminiViewModel = geminiViewModel
-    }
-
-    // Wire WebRTC VM to Stream VM for frame forwarding
-    LaunchedEffect(webrtcViewModel) {
-        streamViewModel.webrtcViewModel = webrtcViewModel
     }
 
     // Start stream or phone camera
@@ -91,9 +81,6 @@ fun StreamScreen(
             if (geminiUiState.isGeminiActive) {
                 geminiViewModel.stopSession()
             }
-            if (webrtcUiState.isActive) {
-                webrtcViewModel.stopSession()
-            }
         }
     }
 
@@ -102,12 +89,6 @@ fun StreamScreen(
         geminiUiState.errorMessage?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
             geminiViewModel.clearError()
-        }
-    }
-    LaunchedEffect(webrtcUiState.errorMessage) {
-        webrtcUiState.errorMessage?.let { msg ->
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-            webrtcViewModel.clearError()
         }
     }
 
@@ -136,19 +117,12 @@ fun StreamScreen(
                 if (geminiUiState.isGeminiActive) {
                     GeminiOverlay(uiState = geminiUiState)
                 }
-
-                // WebRTC overlay
-                if (webrtcUiState.isActive) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    WebRTCOverlay(uiState = webrtcUiState)
-                }
             }
 
             // Controls at bottom
             ControlsRow(
                 onStopStream = {
                     if (geminiUiState.isGeminiActive) geminiViewModel.stopSession()
-                    if (webrtcUiState.isActive) webrtcViewModel.stopSession()
                     streamViewModel.stopStream()
                     wearablesViewModel.navigateToDeviceSelection()
                 },
@@ -161,14 +135,6 @@ fun StreamScreen(
                     }
                 },
                 isAIActive = geminiUiState.isGeminiActive,
-                onToggleLive = {
-                    if (webrtcUiState.isActive) {
-                        webrtcViewModel.stopSession()
-                    } else {
-                        webrtcViewModel.startSession()
-                    }
-                },
-                isLiveActive = webrtcUiState.isActive,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }

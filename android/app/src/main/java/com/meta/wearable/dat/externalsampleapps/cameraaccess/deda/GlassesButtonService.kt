@@ -56,6 +56,7 @@ class GlassesButtonService : Service() {
         private const val CHANNEL_ID = "deda_buttons"
         private const val NOTIFICATION_ID = 2001
         const val ACTION_TOGGLE = "deda.action.TOGGLE"
+        const val ACTION_QUIT = "deda.action.QUIT"
         private const val RECLAIM_DELAY_MS = 700L
 
         fun start(context: Context) {
@@ -65,6 +66,13 @@ class GlassesButtonService : Service() {
         fun toggle(context: Context) {
             context.startForegroundService(
                 Intent(context, GlassesButtonService::class.java).setAction(ACTION_TOGGLE)
+            )
+        }
+
+        /** Quit Deda completely; the glasses fall back to a plain Bluetooth headset. */
+        fun quit(context: Context) {
+            context.startForegroundService(
+                Intent(context, GlassesButtonService::class.java).setAction(ACTION_QUIT)
             )
         }
     }
@@ -110,6 +118,13 @@ class GlassesButtonService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_QUIT) {
+            // Handled FIRST: a quit must not re-assert the foreground state it
+            // is about to tear down. NOT_STICKY so the system never resurrects
+            // a service the user explicitly closed.
+            quitCompletely()
+            return START_NOT_STICKY
+        }
         if (!watchingOthers) watchOtherSessions() // access may have been granted since onCreate
         // Re-assert the foreground types: the RECORD_AUDIO permission may have
         // been granted since onCreate, which unlocks the microphone type.
@@ -387,6 +402,21 @@ class GlassesButtonService : Service() {
 
     // ---- Deda standby ---------------------------------------------------------
 
+    /**
+     * Whole-app QUIT (owner's MVP item A): Deda goes away completely and the
+     * glasses behave like a plain Bluetooth headset, as if the app were not
+     * installed. The controller's OFF branch already closes the session,
+     * TalkVision, SCO and audio focus; onDestroy releases the MediaSession, so
+     * the media buttons return to the system. Opening the app again starts the
+     * service anew (MainActivity) — that is the way back in.
+     */
+    private fun quitCompletely() {
+        Log.d(TAG, "quit — stopping the service completely")
+        DedaState.set(DedaMode.OFF)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
     private fun toggleStandby(source: String) {
         val on = !DedaState.isOn()
         DedaState.set(if (on) DedaMode.STANDBY else DedaMode.OFF)
@@ -426,6 +456,10 @@ class GlassesButtonService : Service() {
             this, 1, Intent(this, GlassesButtonService::class.java).setAction(ACTION_TOGGLE),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        val quit = PendingIntent.getService(
+            this, 2, Intent(this, GlassesButtonService::class.java).setAction(ACTION_QUIT),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
         val texts = Greeter.Texts.forCurrentLanguage()
         val title = when (mode) {
             DedaMode.OFF -> texts.sleeping
@@ -440,6 +474,7 @@ class GlassesButtonService : Service() {
         }
         return ServiceNotifications.builder(this, CHANNEL_ID, title, hint)
             .addAction(0, if (on) texts.turnOff else texts.turnOn, toggle)
+            .addAction(0, texts.quitApp, quit)
             .build()
     }
 }

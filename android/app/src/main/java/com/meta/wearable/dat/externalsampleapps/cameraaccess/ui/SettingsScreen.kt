@@ -59,8 +59,6 @@ fun SettingsScreen(
     var glassesMic by remember { mutableStateOf(SettingsManager.glassesMicEnabled) }
     var dedaActivation by remember { mutableStateOf(SettingsManager.dedaActivationMode) }
     var dedaSilenceSec by remember { mutableStateOf(SettingsManager.dedaSilenceTimeoutSec.toString()) }
-    var dedaMaxMin by remember { mutableStateOf(SettingsManager.dedaMaxSessionMin.toString()) }
-    var webrtcSignalingURL by remember { mutableStateOf(SettingsManager.webrtcSignalingURLUser) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     fun save() {
@@ -70,8 +68,6 @@ fun SettingsScreen(
         SettingsManager.glassesMicEnabled = glassesMic
         SettingsManager.dedaActivationMode = dedaActivation
         dedaSilenceSec.toIntOrNull()?.let { SettingsManager.dedaSilenceTimeoutSec = it }
-        dedaMaxMin.toIntOrNull()?.let { SettingsManager.dedaMaxSessionMin = it }
-        SettingsManager.webrtcSignalingURL = webrtcSignalingURL.trim()
         // The always-on service re-reads the activation mode on every start.
         GlassesButtonService.start(context)
     }
@@ -84,8 +80,6 @@ fun SettingsScreen(
         glassesMic = SettingsManager.glassesMicEnabled
         dedaActivation = SettingsManager.dedaActivationMode
         dedaSilenceSec = SettingsManager.dedaSilenceTimeoutSec.toString()
-        dedaMaxMin = SettingsManager.dedaMaxSessionMin.toString()
-        webrtcSignalingURL = SettingsManager.webrtcSignalingURLUser
     }
 
     // Switching language rewrites the prompt in the box, unless the user has
@@ -239,14 +233,7 @@ fun SettingsScreen(
                 placeholder = "15",
                 keyboardType = KeyboardType.Number,
             )
-            MonoTextField(
-                value = dedaMaxMin,
-                onValueChange = { dedaMaxMin = it.filter { c -> c.isDigit() } },
-                label = "Force-close conversation after (minutes)",
-                placeholder = "15",
-                keyboardType = KeyboardType.Number,
-            )
-            Hint("A conversation ends by itself after the silence above, and never runs longer than the cap.")
+            Hint("A conversation ends when you say the farewell phrase or after the silence above; Google's own session limit may also end it.")
 
             SectionHeader("System Prompt")
             OutlinedTextField(
@@ -264,16 +251,6 @@ fun SettingsScreen(
                     Text("Restore default for " + language.displayName)
                 }
             }
-
-            SectionHeader("WebRTC")
-            MonoTextField(
-                value = webrtcSignalingURL,
-                onValueChange = { webrtcSignalingURL = it },
-                label = "Signaling URL",
-                placeholder = "wss://your-server.example.com",
-                keyboardType = KeyboardType.Uri,
-            )
-            Hint("Optional. Only needed to mirror the view to a browser.")
 
             TextButton(onClick = { showResetDialog = true }) {
                 Text("Reset to Defaults", color = Color.Red)

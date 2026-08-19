@@ -25,6 +25,15 @@ object GeminiConfig {
 
     const val VIDEO_JPEG_QUALITY = 80 // one frame per question, so we can afford it (was 50 at 1 fps)
 
+    /**
+     * Longest edge (px) for a preloaded photo (GeminiSession.preloadFrame).
+     * A real capturePhoto still is ~4x the pixels of the old video-frame
+     * path; capping the longest edge keeps one JPEG from gambling the
+     * WebSocket send. Smaller pictures pass through unscaled, and the JPEG
+     * quality stays [VIDEO_JPEG_QUALITY].
+     */
+    const val PHOTO_MAX_SEND_EDGE = 2560
+
     val language: AssistantLanguage
         get() = SettingsManager.assistantLanguage
 

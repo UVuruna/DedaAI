@@ -11,11 +11,8 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.stream
 import android.app.Application
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.util.Log
 import androidx.core.content.FileProvider
-import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
@@ -32,10 +29,9 @@ import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.DeviceSelector
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiSessionViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.phone.PhoneCameraManager
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.PhotoDecode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.VideoFrames
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.webrtc.WebRTCSessionViewModel
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -65,9 +61,8 @@ class StreamViewModel(
   private var videoJob: Job? = null
   private var stateJob: Job? = null
 
-  // VisionClaw additions
+  // DedaAI additions
   var geminiViewModel: GeminiSessionViewModel? = null
-  var webrtcViewModel: WebRTCSessionViewModel? = null
   private var phoneCameraManager: PhoneCameraManager? = null
 
   fun startStream() {
@@ -109,8 +104,6 @@ class StreamViewModel(
       _uiState.update { it.copy(videoFrame = bitmap) }
       // Forward to Gemini (throttled inside the VM)
       geminiViewModel?.onCameraFrame(bitmap)
-      // Forward to WebRTC (every frame)
-      webrtcViewModel?.pushVideoFrame(bitmap)
     }
 
     _uiState.update {
@@ -218,102 +211,17 @@ class StreamViewModel(
 
     // Forward to Gemini (throttled inside the VM)
     geminiViewModel?.onCameraFrame(bitmap)
-    // Forward to WebRTC (every frame)
-    webrtcViewModel?.pushVideoFrame(bitmap)
   }
 
   private fun handlePhotoData(photo: PhotoData) {
-    val capturedPhoto =
-        when (photo) {
-          is PhotoData.Bitmap -> photo.bitmap
-          is PhotoData.HEIC -> {
-            val byteArray = ByteArray(photo.data.remaining())
-            photo.data.get(byteArray)
-
-            // Extract EXIF transformation matrix and apply to bitmap
-            val exifInfo = getExifInfo(byteArray)
-            val transform = getTransform(exifInfo)
-            decodeHeic(byteArray, transform)
-          }
-        }
+    // Decoding lives in PhotoDecode so a Deda conversation's one-shot picture
+    // (TalkVision) turns stills into bitmaps exactly the same way.
+    val capturedPhoto = PhotoDecode.toBitmap(photo)
+    if (capturedPhoto == null) {
+      Log.e(TAG, "Failed to decode captured photo")
+      return
+    }
     _uiState.update { it.copy(capturedPhoto = capturedPhoto, isShareDialogVisible = true) }
-  }
-
-  // HEIC Decoding with EXIF transformation
-  private fun decodeHeic(heicBytes: ByteArray, transform: Matrix): Bitmap {
-    val bitmap = BitmapFactory.decodeByteArray(heicBytes, 0, heicBytes.size)
-    return applyTransform(bitmap, transform)
-  }
-
-  private fun getExifInfo(heicBytes: ByteArray): ExifInterface? {
-    return try {
-      ByteArrayInputStream(heicBytes).use { inputStream -> ExifInterface(inputStream) }
-    } catch (e: IOException) {
-      Log.w(TAG, "Failed to read EXIF from HEIC", e)
-      null
-    }
-  }
-
-  private fun getTransform(exifInfo: ExifInterface?): Matrix {
-    val matrix = Matrix()
-
-    if (exifInfo == null) {
-      return matrix // Identity matrix (no transformation)
-    }
-
-    when (
-        exifInfo.getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL,
-        )
-    ) {
-      ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> {
-        matrix.postScale(-1f, 1f)
-      }
-      ExifInterface.ORIENTATION_ROTATE_180 -> {
-        matrix.postRotate(180f)
-      }
-      ExifInterface.ORIENTATION_FLIP_VERTICAL -> {
-        matrix.postScale(1f, -1f)
-      }
-      ExifInterface.ORIENTATION_TRANSPOSE -> {
-        matrix.postRotate(90f)
-        matrix.postScale(-1f, 1f)
-      }
-      ExifInterface.ORIENTATION_ROTATE_90 -> {
-        matrix.postRotate(90f)
-      }
-      ExifInterface.ORIENTATION_TRANSVERSE -> {
-        matrix.postRotate(270f)
-        matrix.postScale(-1f, 1f)
-      }
-      ExifInterface.ORIENTATION_ROTATE_270 -> {
-        matrix.postRotate(270f)
-      }
-      ExifInterface.ORIENTATION_NORMAL,
-      ExifInterface.ORIENTATION_UNDEFINED -> {
-        // No transformation needed
-      }
-    }
-
-    return matrix
-  }
-
-  private fun applyTransform(bitmap: Bitmap, matrix: Matrix): Bitmap {
-    if (matrix.isIdentity) {
-      return bitmap
-    }
-
-    return try {
-      val transformed = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-      if (transformed != bitmap) {
-        bitmap.recycle()
-      }
-      transformed
-    } catch (e: OutOfMemoryError) {
-      Log.e(TAG, "Failed to apply transformation due to memory", e)
-      bitmap
-    }
   }
 
   override fun onCleared() {

@@ -12,6 +12,7 @@ import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiSession
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.StreamingService
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.PhotoDecode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.VideoFrames
 import android.graphics.Bitmap
 import kotlinx.coroutines.CoroutineScope
@@ -96,24 +97,28 @@ object TalkVision {
     }
 
     /**
-     * One-shot: open the glasses camera just long enough to grab a single
-     * frame, then close it. This is the owner's actual conversation spec
+     * One-shot: open the glasses camera just long enough for a single REAL
+     * still (StreamSession.capturePhoto — full resolution, not a video
+     * frame), then close it. This is the owner's actual conversation spec
      * ("one picture at the START of the conversation") — the picture is
      * taken BEFORE the Gemini audio session starts, so the camera channel
      * and the conversation audio never run at the same time (running them
      * together muted the session on real hardware, 2026-08-19).
      *
-     * Calls [onDone] exactly once, on the main thread, with the frame or
+     * Calls [onDone] exactly once, on the main thread, with the picture or
      * null (no glasses, timeout, any failure, or the continuous stream
      * already owning the camera) — the caller proceeds audio-only on null.
+     * When the still itself fails, the first video frame is the fallback: a
+     * worse picture beats none.
      *
      * [timeoutMs] must stay BELOW the 5 s floor of dedaSilenceTimeoutSec
      * (SettingsManager coerceIn): the capture runs inside TALKING before the
      * session opens, and a silence-timer expiry mid-capture would close a
      * conversation that never got to start (pregled 15, finding 3 — endTalk
-     * now survives that too, but by ending the conversation).
+     * now survives that too, but by ending the conversation). The 4 s
+     * default leaves a real photo enough time while staying under that floor.
      */
-    fun captureOnce(context: Context, timeoutMs: Long = 2_500L, onDone: (Bitmap?) -> Unit) {
+    fun captureOnce(context: Context, timeoutMs: Long = 4_000L, onDone: (Bitmap?) -> Unit) {
         if (session != null) {
             // The continuous stream (phone-mic conversations, stream screen)
             // already owns the camera; its own pipeline feeds the session.
@@ -153,8 +158,22 @@ object TalkVision {
             }
         }
         val grab = scope.launch(Dispatchers.Default) {
-            val frame = opened.videoStream.firstOrNull()
-            val bmp = frame?.let { VideoFrames.toBitmap(it) }
+            // capturePhoto on a session that is still STARTING fails outright,
+            // so wait until the stream actually runs (the timeout below still
+            // bounds the whole attempt).
+            opened.state.firstOrNull { it == StreamSessionState.STREAMING }
+            val photo = try {
+                opened.capturePhoto().getOrNull()
+            } catch (e: Exception) {
+                Log.w(TAG, "one-shot: capturePhoto failed: ${e.message}")
+                null
+            }
+            var bmp = photo?.let { PhotoDecode.toBitmap(it) }
+            if (bmp == null) {
+                // A worse picture beats none: fall back to the first video frame.
+                Log.w(TAG, "one-shot: no real still — falling back to a video frame")
+                bmp = opened.videoStream.firstOrNull()?.let { VideoFrames.toBitmap(it) }
+            }
             withContext(Dispatchers.Main) { finish(bmp) }
         }
         scope.launch {
