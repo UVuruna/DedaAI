@@ -9,6 +9,7 @@ import android.os.Looper
 import android.util.Log
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiSession
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.VideoFrameMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.HeadsetRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ object DedaController {
     private const val TAG = "DedaController"
     private const val CONNECT_TIMEOUT_MS = 25_000L
     private const val TRANSCRIPT_TAIL_CHARS = 80
+    private const val TALKING_EXIT_WATCHDOG_MS = 3_000L
 
     private val handler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -89,9 +91,25 @@ object DedaController {
             }
             DedaMode.TALKING -> {
                 wake?.stop()
-                // The glasses camera opens for the whole conversation, so the
-                // session can attach a picture when the user asks a question.
-                appContext?.let { TalkVision.start(it) }
+                // The glasses camera streams into the conversation ONLY while
+                // the conversation's audio does NOT ride the glasses' headset
+                // link. On the owner's phone (2026-08-19 ~17:00) opening the
+                // DAT stream in a glasses-mic session left the session mute in
+                // both directions — stream + SCO coexistence has never been
+                // proven on hardware. Until it is, glasses-mic conversations
+                // run audio-only and the system prompt has the model admit it
+                // cannot see, instead of killing the voice link.
+                val eyes = !SettingsManager.glassesMicEnabled &&
+                    SettingsManager.videoFrameMode != VideoFrameMode.OFF
+                if (eyes) {
+                    appContext?.let { TalkVision.start(it) }
+                } else {
+                    Log.d(
+                        TAG,
+                        "talking without eyes (glassesMic=${SettingsManager.glassesMicEnabled}," +
+                            " camera=${SettingsManager.videoFrameMode})",
+                    )
+                }
                 startTimers()
             }
         }
@@ -130,15 +148,32 @@ object DedaController {
     /** Any end of a session — asked for, timed out, or dropped by the server. */
     private fun onSessionEnded(reason: String?) {
         handler.removeCallbacks(connectWatchdog)
+        handler.removeCallbacks(talkingExitWatchdog)
         if (DedaState.mode.value != DedaMode.TALKING) return
         Log.d(TAG, "session ended (${reason ?: "asked to stop"}) — back to standby")
         greeter?.chime(false)
         DedaState.set(DedaMode.STANDBY)
     }
 
+    /**
+     * Diagnostic only — by design this can never fire: stopSession resets
+     * state and delivers onSessionEnded synchronously (its only blocking
+     * work is handed to a background thread inside AudioManager.stopCapture),
+     * and that delivery is queued ahead of this watchdog. If this line ever
+     * shows up in a log, the state machine really is wedged and the layer
+     * that blocked it (audio route, session teardown) must be found and
+     * fixed there — not papered over by forcing a mode here (pregled 12).
+     */
+    private val talkingExitWatchdog = Runnable {
+        if (DedaState.mode.value == DedaMode.TALKING) {
+            Log.e(TAG, "TALKING outlived endTalk by ${TALKING_EXIT_WATCHDOG_MS} ms — state machine wedged")
+        }
+    }
+
     private fun endTalk(reason: String) {
         if (DedaState.mode.value != DedaMode.TALKING) return
         Log.d(TAG, "closing session: $reason")
+        handler.postDelayed(talkingExitWatchdog, TALKING_EXIT_WATCHDOG_MS)
         GeminiSession.stopSession(reason) // fires onSessionEnded -> STANDBY
     }
 
@@ -199,6 +234,7 @@ object DedaController {
         handler.removeCallbacks(silenceTick)
         handler.removeCallbacks(hardStop)
         handler.removeCallbacks(connectWatchdog)
+        handler.removeCallbacks(talkingExitWatchdog)
     }
 
     // ---- audio focus and the glasses mic ------------------------------------

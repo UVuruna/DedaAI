@@ -194,6 +194,17 @@ fun SettingsScreen(
                 onSelect = { videoFrameMode = it },
             )
             Hint(videoFrameMode.description)
+            if (glassesMic && videoFrameMode != VideoFrameMode.OFF) {
+                // The camera setting looks live, but glasses-mic conversations
+                // deliberately run without it (DedaController gate, pregled 12)
+                // — streaming the camera was found to mute the headset link on
+                // real hardware. Say so instead of silently sending no frames.
+                Hint(
+                    "Note: with the Glasses microphone, voice conversations run " +
+                        "without the camera for now — streaming it muted the " +
+                        "glasses' audio link. The camera screen is unaffected."
+                )
+            }
 
             SectionHeader("Microphone")
             ChipRow(
