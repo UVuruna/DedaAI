@@ -98,6 +98,9 @@ class Greeter(context: Context) {
     private fun applyLocale() {
         val r = tts?.setLanguage(locale()) ?: TextToSpeech.LANG_MISSING_DATA
         ttsLocaleOk = r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED
+        // The phone's Serbian voice rushes through the greeting; a slower rate
+        // keeps it intelligible over the glasses (owner's test, 2026-08-19).
+        tts?.setSpeechRate(0.85f)
         tts?.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANT)

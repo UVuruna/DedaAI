@@ -185,6 +185,16 @@ object GeminiSession {
         }
     }
 
+    /**
+     * Forgets the frame held for the next question. Called when the camera
+     * source dies mid-conversation (TalkVision, pregled 5 bug 2) — otherwise
+     * every later question would attach the last picture from before the
+     * failure and the model would describe a stale scene as if it were live.
+     */
+    fun clearHeldFrame() {
+        latestFrame = null
+    }
+
     /** Called by [AudioManager] on the first syllable of an utterance. */
     private fun sendFrameForQuestion() {
         if (SettingsManager.videoFrameMode != VideoFrameMode.ON_QUESTION) return

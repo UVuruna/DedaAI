@@ -73,18 +73,25 @@ object DedaController {
             DedaMode.OFF -> {
                 stopTimers()
                 wake?.stop()
-                if (prev == DedaMode.TALKING) GeminiSession.stopSession()
+                if (prev == DedaMode.TALKING) {
+                    appContext?.let { TalkVision.stop(it) }
+                    GeminiSession.stopSession()
+                }
                 releaseSco()
                 abandonFocus()
             }
             DedaMode.STANDBY -> {
                 stopTimers()
+                if (prev == DedaMode.TALKING) appContext?.let { TalkVision.stop(it) }
                 requestFocus() // pauses whatever music was playing
                 acquireSco()
                 startWakeListening()
             }
             DedaMode.TALKING -> {
                 wake?.stop()
+                // The glasses camera opens for the whole conversation, so the
+                // session can attach a picture when the user asks a question.
+                appContext?.let { TalkVision.start(it) }
                 startTimers()
             }
         }
@@ -154,6 +161,10 @@ object DedaController {
 
     private fun onTranscript(text: String) {
         if (DedaState.mode.value != DedaMode.TALKING) return
+        // Logged verbatim: the owner's test showed the stop phrase not closing
+        // the session, and without seeing what Gemini actually transcribed
+        // there is no way to tell whether it never arrived or never matched.
+        Log.d(TAG, "user transcript: \"$text\"")
         lastActivityAt = System.currentTimeMillis()
         transcriptTail = (transcriptTail + " " + text).takeLast(TRANSCRIPT_TAIL_CHARS)
         if (WakePhrases.isStop(transcriptTail)) {

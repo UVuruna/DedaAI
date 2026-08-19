@@ -27,13 +27,27 @@ class StreamingService : Service() {
     private const val NOTIFICATION_ID = 1001
     private const val WAKELOCK_TAG = "VisionClaw::StreamingWakeLock"
 
-    fun start(context: Context) {
+    /**
+     * Both the stream screen and a Deda conversation (TalkVision) keep this
+     * service alive. A plain stop from one used to kill the other's
+     * keep-alive mid-use (pregled 5, bug 1), so each caller names itself and
+     * the service runs while anyone still needs it. Repeated starts from the
+     * same owner do not inflate the count. All callers are on the main thread.
+     */
+    private val owners = mutableSetOf<String>()
+
+    fun start(context: Context, owner: String) {
+      val wasEmpty = owners.isEmpty()
+      owners.add(owner)
+      if (!wasEmpty) return // already running for another owner
       val intent =
           Intent(context, StreamingService::class.java).apply { `package` = context.packageName }
       context.startForegroundService(intent)
     }
 
-    fun stop(context: Context) {
+    fun stop(context: Context, owner: String) {
+      owners.remove(owner)
+      if (owners.isNotEmpty()) return // someone still needs it
       val intent =
           Intent(context, StreamingService::class.java).apply { `package` = context.packageName }
       context.stopService(intent)

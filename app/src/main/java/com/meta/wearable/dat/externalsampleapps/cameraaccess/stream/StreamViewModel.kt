@@ -12,10 +12,7 @@ import android.app.Application
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
 import android.graphics.Matrix
-import android.graphics.Rect
-import android.graphics.YuvImage
 import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
@@ -35,10 +32,10 @@ import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.DeviceSelector
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiSessionViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.phone.PhoneCameraManager
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.VideoFrames
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.webrtc.WebRTCSessionViewModel
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -78,7 +75,7 @@ class StreamViewModel(
     stateJob?.cancel()
 
     // Start foreground service to keep streaming alive in background / screen locked
-    StreamingService.start(getApplication())
+    StreamingService.start(getApplication(), "stream-screen")
 
     val streamSession =
         Wearables.startStreamSession(
@@ -128,7 +125,7 @@ class StreamViewModel(
 
   fun stopStream() {
     // Stop foreground service
-    StreamingService.stop(getApplication())
+    StreamingService.stop(getApplication(), "stream-screen")
 
     videoJob?.cancel()
     videoJob = null
@@ -214,48 +211,15 @@ class StreamViewModel(
   }
 
   private fun handleVideoFrame(videoFrame: VideoFrame) {
-    // VideoFrame contains raw I420 video data in a ByteBuffer
-    val buffer = videoFrame.buffer
-    val dataSize = buffer.remaining()
-    val byteArray = ByteArray(dataSize)
-
-    // Save current position
-    val originalPosition = buffer.position()
-    buffer.get(byteArray)
-    // Restore position
-    buffer.position(originalPosition)
-
-    // Convert I420 to NV21 format which is supported by Android's YuvImage
-    val nv21 = convertI420toNV21(byteArray, videoFrame.width, videoFrame.height)
-    val image = YuvImage(nv21, ImageFormat.NV21, videoFrame.width, videoFrame.height, null)
-    val out =
-        ByteArrayOutputStream().use { stream ->
-          image.compressToJpeg(Rect(0, 0, videoFrame.width, videoFrame.height), 50, stream)
-          stream.toByteArray()
-        }
-
-    val bitmap = BitmapFactory.decodeByteArray(out, 0, out.size)
+    // Conversion lives in VideoFrames so the Deda conversation (TalkVision)
+    // turns frames into bitmaps exactly the same way.
+    val bitmap = VideoFrames.toBitmap(videoFrame) ?: return
     _uiState.update { it.copy(videoFrame = bitmap) }
 
     // Forward to Gemini (throttled inside the VM)
     geminiViewModel?.onCameraFrame(bitmap)
     // Forward to WebRTC (every frame)
     webrtcViewModel?.pushVideoFrame(bitmap)
-  }
-
-  // Convert I420 (YYYYYYYY:UUVV) to NV21 (YYYYYYYY:VUVU)
-  private fun convertI420toNV21(input: ByteArray, width: Int, height: Int): ByteArray {
-    val output = ByteArray(input.size)
-    val size = width * height
-    val quarter = size / 4
-
-    input.copyInto(output, 0, 0, size) // Y is the same
-
-    for (n in 0 until quarter) {
-      output[size + n * 2] = input[size + quarter + n] // V first
-      output[size + n * 2 + 1] = input[size + n] // U second
-    }
-    return output
   }
 
   private fun handlePhotoData(photo: PhotoData) {
