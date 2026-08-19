@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -96,6 +97,18 @@ fun SettingsScreen(
         systemPrompt = SettingsManager.geminiSystemPrompt
     }
 
+    // Declared before the guide early-return so the list does not jump back
+    // to the top after closing a guide (pregled 11).
+    val scrollState = rememberScrollState()
+
+    // A help guide (assets/guide_*.html) opened over Settings, or null. Pair of
+    // (asset file, screen title). Shown full-screen so the guide reads big.
+    var guideAsset by remember { mutableStateOf<Pair<String, String>?>(null) }
+    guideAsset?.let { (asset, title) ->
+        GuideScreen(assetFile = asset, title = title, onBack = { guideAsset = null })
+        return
+    }
+
     // One exit path for the arrow AND the system back gesture — two copies
     // is exactly how the gesture was forgotten the first time (pregled 9).
     val exitAndSave = {
@@ -117,7 +130,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -129,7 +142,40 @@ fun SettingsScreen(
                 label = "API Key",
                 placeholder = "Enter Gemini API key",
             )
-            Hint("Empty = the app's built-in default key. Paste your own free key from aistudio.google.com/apikey (no card required).")
+            Hint("Deda needs your own free Gemini key (no card required). Tap the guide below — it walks you through it with pictures.")
+
+            // lang-ok-begin: user-facing help button labels and share text, per language
+            val keyGuide = when (language) {
+                AssistantLanguage.SERBIAN -> "Vodič: kako uneti ključ"
+                AssistantLanguage.SLOVENIAN -> "Vodič: kako vnesti ključ"
+                AssistantLanguage.ENGLISH -> "Guide: how to add the key"
+            }
+            val installGuide = when (language) {
+                AssistantLanguage.SERBIAN -> "Vodič: instalacija (za deljenje)"
+                AssistantLanguage.SLOVENIAN -> "Vodič: namestitev (za deljenje)"
+                AssistantLanguage.ENGLISH -> "Guide: install (to share)"
+            }
+            val shareLabel = when (language) {
+                AssistantLanguage.SERBIAN -> "Podeli Dedu (link / QR)"
+                AssistantLanguage.SLOVENIAN -> "Deli Dedo (povezava / QR)"
+                AssistantLanguage.ENGLISH -> "Share Deda (link / QR)"
+            }
+            val shareText = "Deda — glasovni asistent. Instalacija korak po korak:\nhttps://uvuruna.github.io/DedaAI/"
+            // lang-ok-end
+            Button(
+                onClick = { guideAsset = "guide_apikey.html" to keyGuide },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("📖  $keyGuide") }
+            TextButton(onClick = { guideAsset = "guide_install.html" to installGuide }) {
+                Text("📲  $installGuide")
+            }
+            TextButton(onClick = {
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                }
+                context.startActivity(android.content.Intent.createChooser(send, shareLabel))
+            }) { Text("🔗  $shareLabel") }
 
             SectionHeader("Language")
             ChipRow(
