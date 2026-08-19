@@ -13,10 +13,13 @@ import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiSession
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.StreamingService
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.VideoFrames
+import android.graphics.Bitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -90,6 +93,65 @@ object TalkVision {
             }
         }
         Log.d(TAG, "glasses camera streaming into the conversation")
+    }
+
+    /**
+     * One-shot: open the glasses camera just long enough to grab a single
+     * frame, then close it. This is the owner's actual conversation spec
+     * ("one picture at the START of the conversation") — the picture is
+     * taken BEFORE the Gemini audio session starts, so the camera channel
+     * and the conversation audio never run at the same time (running them
+     * together muted the session on real hardware, 2026-08-19).
+     *
+     * Calls [onDone] exactly once, on the main thread, with the frame or
+     * null (no glasses, timeout, any failure, or the continuous stream
+     * already owning the camera) — the caller proceeds audio-only on null.
+     */
+    fun captureOnce(context: Context, timeoutMs: Long = 2_500L, onDone: (Bitmap?) -> Unit) {
+        if (session != null) {
+            // The continuous stream (phone-mic conversations, stream screen)
+            // already owns the camera; its own pipeline feeds the session.
+            onDone(null)
+            return
+        }
+        val opened = try {
+            Wearables.startStreamSession(
+                context.applicationContext,
+                AutoDeviceSelector(),
+                StreamConfiguration(videoQuality = VideoQuality.HIGH, 24),
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "one-shot: glasses camera unavailable — talking without a picture: ${e.message}")
+            onDone(null)
+            return
+        }
+        var done = false
+        // Main-thread only (both callers land here via Dispatchers.Main), so
+        // the flag needs no lock and onDone cannot run twice.
+        val finish: (Bitmap?) -> Unit = { bmp ->
+            if (!done) {
+                done = true
+                try {
+                    opened.close()
+                } catch (e: Exception) {
+                    Log.w(TAG, "one-shot: stream close failed: ${e.message}")
+                }
+                Log.d(TAG, "one-shot picture ${if (bmp != null) "captured" else "NOT captured"}")
+                onDone(bmp)
+            }
+        }
+        val grab = scope.launch(Dispatchers.Default) {
+            val frame = opened.videoStream.firstOrNull()
+            val bmp = frame?.let { VideoFrames.toBitmap(it) }
+            withContext(Dispatchers.Main) { finish(bmp) }
+        }
+        scope.launch {
+            delay(timeoutMs)
+            if (!done) {
+                grab.cancel()
+                finish(null)
+            }
+        }
     }
 
     fun stop(context: Context) {

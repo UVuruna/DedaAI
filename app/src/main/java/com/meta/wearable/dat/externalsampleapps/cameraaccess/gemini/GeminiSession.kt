@@ -186,6 +186,18 @@ object GeminiSession {
     }
 
     /**
+     * A frame captured BEFORE the session opened — the one-shot picture at
+     * the start of a glasses-mic conversation (TalkVision.captureOnce). Held
+     * exactly like an ON_QUESTION frame and sent when the user starts
+     * speaking. Deliberately skips the isReady() check of [onCameraFrame]:
+     * at preload time the session is only about to be started, and a stale
+     * frame cannot leak into a later session because stopSession clears it.
+     */
+    fun preloadFrame(bitmap: Bitmap) {
+        latestFrame = bitmap
+    }
+
+    /**
      * Forgets the frame held for the next question. Called when the camera
      * source dies mid-conversation (TalkVision, pregled 5 bug 2) — otherwise
      * every later question would attach the last picture from before the

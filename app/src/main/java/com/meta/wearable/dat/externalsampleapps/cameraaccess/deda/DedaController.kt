@@ -9,6 +9,7 @@ import android.os.Looper
 import android.util.Log
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini.GeminiSession
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.VideoFrameMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.util.HeadsetRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -102,10 +103,13 @@ object DedaController {
                 if (eyes) {
                     appContext?.let { TalkVision.start(it) }
                 } else {
+                    // Glasses-mic ON_QUESTION conversations still get their
+                    // one picture — grabbed one-shot in onWake BEFORE the
+                    // audio starts, never from a stream held open here.
                     Log.d(
                         TAG,
-                        "talking without eyes (glassesMic=${SettingsManager.glassesMicEnabled}," +
-                            " camera=${SettingsManager.videoFrameMode})",
+                        "no continuous camera in this conversation (glassesMic=" +
+                            "${SettingsManager.glassesMicEnabled}, camera=${SettingsManager.videoFrameMode})",
                     )
                 }
                 startTimers()
@@ -125,9 +129,36 @@ object DedaController {
         Log.d(TAG, "wake phrase — opening a session")
         greeter?.chime(true)
         DedaState.set(DedaMode.TALKING)
+        // The owner's conversation spec: ONE picture, taken at the START of
+        // the conversation, attached when the first question begins. With
+        // the glasses mic the camera cannot stay open during the talk (it
+        // mutes the headset link — 2026-08-19), so the picture is grabbed
+        // one-shot HERE, before the audio session starts, and preloaded.
+        val ctx = appContext
+        val oneShotPicture = ctx != null &&
+            SettingsManager.glassesMicEnabled &&
+            SettingsManager.videoFrameMode == VideoFrameMode.ON_QUESTION
+        if (oneShotPicture) {
+            TalkVision.captureOnce(ctx!!) { picture ->
+                // The user may have tapped out during the ~2 s capture.
+                if (DedaState.mode.value != DedaMode.TALKING) return@captureOnce
+                if (picture != null) GeminiSession.preloadFrame(picture)
+                openSession()
+            }
+        } else {
+            openSession()
+        }
+    }
+
+    /** The audio half of opening a conversation; mode is already TALKING. */
+    private fun openSession() {
+        if (DedaState.mode.value != DedaMode.TALKING) return
         GeminiSession.startSession()
         if (!GeminiSession.uiState.value.isGeminiActive) {
             // Refused synchronously (no API key). Back to standby, sad chime.
+            // A preloaded one-shot picture must not survive into some later
+            // session as a stale scene.
+            GeminiSession.clearHeldFrame()
             Log.w(TAG, "session refused: ${GeminiSession.uiState.value.errorMessage}")
             greeter?.chime(false)
             DedaState.set(DedaMode.STANDBY)

@@ -194,17 +194,21 @@ fun SettingsScreen(
                 onSelect = { videoFrameMode = it },
             )
             Hint(videoFrameMode.description)
-            if (videoFrameMode != VideoFrameMode.OFF &&
-                !SettingsManager.cameraStreamsInConversation(glassesMic, videoFrameMode)
-            ) {
-                // The camera setting looks live, but glasses-mic conversations
-                // deliberately run without it (DedaController gate, pregled 12)
-                // — streaming the camera was found to mute the headset link on
-                // real hardware. Say so instead of silently sending no frames.
+            if (glassesMic && videoFrameMode == VideoFrameMode.ON_QUESTION) {
+                // Glasses-mic conversations cannot keep the camera open (the
+                // stream mutes the headset link — 2026-08-19), so the picture
+                // is grabbed once, before the audio starts. Say so.
                 Hint(
-                    "Note: with the Glasses microphone, voice conversations run " +
-                        "without the camera for now — streaming it muted the " +
-                        "glasses' audio link. The camera screen is unaffected."
+                    "Note: with the Glasses microphone the picture is taken " +
+                        "once, at the start of the conversation — keeping the " +
+                        "camera open during the talk would mute the glasses' audio."
+                )
+            } else if (glassesMic && videoFrameMode == VideoFrameMode.STREAM) {
+                Hint(
+                    "Note: continuous frames don't work with the Glasses " +
+                        "microphone (the open camera mutes its audio link), so " +
+                        "conversations get no pictures in this combination. " +
+                        "Choose On question for one picture per conversation."
                 )
             }
 
