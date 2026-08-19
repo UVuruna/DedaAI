@@ -10,7 +10,7 @@ telefona.
 Otvori ovu stranicu na telefonu (ili skeniraj QR) — vodi te korak po korak
 kroz instalaciju i preuzimanje:
 
-### 👉 **https://uvuruna.github.io/deda/**
+### 👉 **https://uvuruna.github.io/DedaAI/**
 
 ![QR kod](qr.png)
 
@@ -18,7 +18,7 @@ Vodiči (slike, SR / SL / EN):
 - **[Instalacija aplikacije → install.html](install.html)**
 - **[Kako napraviti Google ključ → vodic.html](vodic.html)**
 
-Direktan link za APK (za one koji znaju): [deda.apk](https://github.com/UVuruna/deda/releases/latest/download/deda.apk)
+Direktan link za APK: [deda.apk](https://github.com/UVuruna/DedaAI/releases/latest/download/deda.apk)
 
 ## Šta radi
 
