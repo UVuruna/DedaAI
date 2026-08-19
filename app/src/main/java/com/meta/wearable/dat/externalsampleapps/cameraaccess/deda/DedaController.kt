@@ -20,9 +20,11 @@ import kotlinx.coroutines.launch
  *
  * Standby and music never mix — standby means the user is actively using the
  * glasses (owner decision 2026-08-18). Entering standby therefore takes
- * transient audio focus, which pauses whatever was playing; losing that focus
- * to another app means the user chose music, so Deda turns itself off, and
- * abandoning it on exit lets the paused music resume by itself.
+ * transient audio focus, which pauses whatever was playing; PERMANENTLY
+ * losing that focus to another app means the user chose music, so Deda turns
+ * itself off (transient losses are ignored — the phone's own speech
+ * recogniser causes one on every listening window), and abandoning focus on
+ * exit lets the paused music resume by itself.
  *
  * In STANDBY the wake-word listener runs on the glasses mic (HeadsetRoute).
  * The start phrase opens a Gemini session (TALKING); the stop phrase — read
@@ -191,12 +193,14 @@ object DedaController {
     // ---- audio focus and the glasses mic ------------------------------------
 
     private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
-        if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-            // Another app started playing: the user chose sound over Deda.
-            if (DedaState.isOn()) {
-                Log.d(TAG, "audio focus lost — Deda off")
-                DedaState.set(DedaMode.OFF)
-            }
+        // Only a PERMANENT loss means the user chose music over Deda (music
+        // apps request GAIN). Transient losses are false alarms: the phone's
+        // own speech recogniser takes transient focus every time the standby
+        // listener opens a window — on the owner's phone that fired 150 ms
+        // after entering standby and Deda was turning itself off.
+        if (change == AudioManager.AUDIOFOCUS_LOSS && DedaState.isOn()) {
+            Log.d(TAG, "audio focus lost for good — Deda off")
+            DedaState.set(DedaMode.OFF)
         }
     }
 

@@ -73,6 +73,13 @@ class GlassesButtonService : Service() {
     private lateinit var sessions: MediaSessionManager
     private var session: MediaSession? = null
     private val handler = Handler(Looper.getMainLooper())
+
+    // The standby greeting, delayed so the SCO route to the glasses can open
+    // first. STANDBY only — if "Hej Deda" already moved us to TALKING inside
+    // that second, the greeting must not talk over the live session (pregled 4).
+    private val pendingGreeting = Runnable {
+        if (DedaState.mode.value == DedaMode.STANDBY) greeter?.say(true)
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var greeter: Greeter? = null
 
@@ -384,7 +391,18 @@ class GlassesButtonService : Service() {
         val on = !DedaState.isOn()
         DedaState.set(if (on) DedaMode.STANDBY else DedaMode.OFF)
         Log.d(TAG, "standby ${if (on) "ON" else "OFF"} ($source)")
-        greeter?.say(on)
+        // A stale pending greeting from a rapid earlier toggle must never
+        // stack with this one (pregled 4).
+        handler.removeCallbacks(pendingGreeting)
+        if (on) {
+            // Entering standby just switched the audio route to the glasses'
+            // SCO link, which takes up to a second to open — a greeting spoken
+            // immediately loses its first words (the owner heard only the tail
+            // of the sentence).
+            handler.postDelayed(pendingGreeting, 1000)
+        } else {
+            greeter?.say(false)
+        }
         // The greeting (TTS engine) counts as "someone playing"; the playback
         // callback settles the state again once it ends. The notification is
         // refreshed by the DedaState observer in onCreate.

@@ -98,6 +98,11 @@ class WakeWordListener(private val context: Context) {
             if (!running && recognizer == null) return@post
             running = false
             handler.removeCallbacks(restart)
+            // cancel() explicitly ends the session inside the recognition
+            // service; destroy() alone left Samsung's recogniser looping on
+            // its own after our stop (seen in logcat: TNG_TRANSCRIPTION kept
+            // cycling the mic for a minute after "standby listening stopped").
+            try { recognizer?.cancel() } catch (_: Exception) {}
             recognizer?.destroy()
             recognizer = null
             Log.d(TAG, "standby listening stopped")
