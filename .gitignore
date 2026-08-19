@@ -1,0 +1,48 @@
+# --- agent tooling and the owner's inbox (never product history) ---
+.claude/
+UV/
+_local/
+RENAME.md.done
+
+# --- the VisionClaw fork this app was born from (kept locally until moved to _local/) ---
+/VisionClaw/
+
+# --- Android (android/) ---
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/java/**/Secrets.kt
+android/keystore/*.jks
+android/keystore/*.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# --- wake-word training (wakeword-training/): scripts + configs + report + trained models are tracked, data is not ---
+wakeword-training/venv/
+wakeword-training/data/
+wakeword-training/openWakeWord/
+wakeword-training/piper-sample-generator/
+wakeword-training/output_*/
+wakeword-training/smoke-test/
+wakeword-training/__pycache__/
+wakeword-training/*.log
+wakeword-training/.cache/
+
+# --- release tooling ---
+release/*.log
+release/guide/*.png
+release/guide/shots/
+release/*.apk
+*.apk
+
+# --- python / misc ---
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+Thumbs.db

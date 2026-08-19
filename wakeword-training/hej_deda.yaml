@@ -1,0 +1,71 @@
+# openWakeWord training config for the Serbian wake phrase "Hej Deda"
+# Run from u:\Coding\Meta RayBan AI\wakeword-training\ (all paths are relative to it).
+# Based on openWakeWord/examples/custom_model.yml — see that file for full docs of every key.
+
+model_name: "hej_deda"
+
+# lang-ok-begin: Serbian wake phrase and adversarial negatives — this IS the TTS input text, must stay Serbian
+target_phrase:
+  - "Hej Deda"
+
+# Serbian near-miss phrases the model must NOT activate on.
+# The automatic adversarial-text generation is English-phoneme based, so these
+# hand-written Serbian negatives matter more than usual. Curate as needed.
+custom_negative_phrases:
+  - "hej dete"
+  - "hej deko"
+  - "hej medo"
+  - "ej deda"
+  - "gde je deda"
+  - "deda mraz"
+  - "hej"
+  - "deda"
+  - "dete"
+  - "deka"
+  - "beda"
+  - "hej bre"
+# lang-ok-end
+
+n_samples: 10000
+n_samples_val: 2000
+
+# Ignored by the ONNX voice path (clip-by-clip synthesis), kept for compatibility
+tts_batch_size: 50
+
+augmentation_batch_size: 16
+
+# Repo root that contains the generate_samples.py shim (binds the Serbian voice)
+piper_sample_generator_path: "./piper-sample-generator"
+
+output_dir: "./output_hej_deda"
+
+rir_paths:
+  - "./data/mit_rirs"
+
+# fma dropped 2026-08-19: rudraml/fma is a script-dataset, unloadable with
+# datasets 5.x; AudioSet backgrounds cover music categories too.
+background_paths:
+  - "./data/audioset_16k"
+
+background_paths_duplication_rate:
+  - 1
+
+false_positive_validation_data_path: "./data/validation_set_features.npy"
+
+# The Serbian voice has only 2 speakers, so squeeze extra variety out of augmentation
+augmentation_rounds: 2
+
+feature_data_files:
+  "ACAV100M_sample": "./data/openwakeword_features_ACAV100M_2000_hrs_16bit.npy"
+
+batch_n_per_class:
+  "ACAV100M_sample": 1024
+  "adversarial_negative": 50
+  "positive": 50
+
+model_type: "dnn"
+layer_size: 32
+
+steps: 50000
+max_negative_weight: 1500
+target_false_positives_per_hour: 0.2

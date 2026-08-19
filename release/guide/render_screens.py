@@ -1,0 +1,168 @@
+"""Virtual agent: renders every step-screen of the API-key guide to a PNG.
+
+Owner's order 2026-08-19: a picture-by-picture guide that walks a total
+beginner through making their own Gemini key. Real screenshots of the
+owner's logged-in Google account would leak their e-mail and key into a
+PUBLIC guide, so the authenticated screens are faithful reconstructions
+drawn in HTML with safe fake data (fake e-mail, masked fake key). The one
+screen that needs no login (the Google sign-in page) is a genuine capture.
+
+The on-screen callouts are Serbian on purpose (the images are localised per
+language when the guide is assembled; this file only renders the SR set).
+"""
+import os
+from playwright.sync_api import sync_playwright
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SHOTS = os.path.join(HERE, 'shots')
+os.makedirs(SHOTS, exist_ok=True)
+
+# lang-ok-begin: on-screen callout text is user-facing guide copy, per-language
+# Each screen is one .frame element; the script shoots them one by one.
+SCREENS = {
+'01_address': '''
+<div class="frame browser">
+  <div class="bbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <div class="url"><b>aistudio.google.com/apikey</b></div></div>
+  <div class="page center">
+    <div class="big">Ukucaj adresu u pregledac:</div>
+    <div class="typed">aistudio.google.com/apikey</div>
+    <div class="cap">Radi na telefonu i na racunaru — u bilo kom pregledacu.</div>
+  </div>
+</div>''',
+'03_terms': '''
+<div class="frame browser">
+  <div class="bbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <div class="url">aistudio.google.com</div></div>
+  <div class="page">
+    <div class="gtitle">Google AI Studio</div>
+    <div class="modal">
+      <div class="mh">Terms of Service</div>
+      <div class="mrow"><span class="chk">&#10004;</span> I accept the Google APIs Terms of Service.</div>
+      <div class="mrow"><span class="chk">&#10004;</span> I agree to the additional terms.</div>
+      <button class="gbtn">Continue</button>
+      <div class="callout" style="top:118px">Stikliraj oba kvadratica pa <b>Continue</b>.</div>
+    </div>
+  </div>
+</div>''',
+'04_getkey': '''
+<div class="frame browser">
+  <div class="bbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <div class="url">aistudio.google.com/apikey</div></div>
+  <div class="page">
+    <div class="gtitle">Google AI Studio</div>
+    <div class="sub">API keys</div>
+    <div class="empty">Jos nemas nijedan kljuc.</div>
+    <button class="gbtn blue big2">&#65291; Create API key</button>
+    <div class="callout" style="top:150px;left:250px">Klikni plavo dugme<br><b>Create API key</b>.</div>
+  </div>
+</div>''',
+'05_create': '''
+<div class="frame browser">
+  <div class="bbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <div class="url">aistudio.google.com/apikey</div></div>
+  <div class="page">
+    <div class="gtitle">Google AI Studio</div>
+    <div class="modal">
+      <div class="mh">Create API key</div>
+      <div class="mrow2">Search Google Cloud projects</div>
+      <div class="proj">My first project &#9662;</div>
+      <button class="gbtn blue">Create API key in new project</button>
+      <div class="callout" style="top:150px">Klikni <b>Create API key in new project</b><br>(ako pita za projekat — pusti predlozeni).</div>
+    </div>
+  </div>
+</div>''',
+'06_copy': '''
+<div class="frame browser">
+  <div class="bbar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <div class="url">aistudio.google.com/apikey</div></div>
+  <div class="page">
+    <div class="gtitle">Google AI Studio</div>
+    <div class="modal">
+      <div class="mh">API key generated</div>
+      <div class="keyrow"><span class="keytext">AIzaSy&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span><button class="copy">&#10697; Copy</button></div>
+      <div class="mnote">Sacuvaj ovaj kljuc. Ne deli ga sa drugima.</div>
+      <div class="callout" style="top:96px;left:250px">Klikni <b>Copy</b> —<br>kljuc je sada kopiran.</div>
+    </div>
+  </div>
+</div>''',
+'07_settings': '''
+<div class="frame phone">
+  <div class="pbar"><span class="arrow">&#8249;</span> Deda &nbsp;&#8226;&nbsp; Settings</div>
+  <div class="ppage">
+    <div class="sh">Gemini API</div>
+    <div class="field"><div class="flabel">API Key</div>
+      <div class="fbox glow">AIzaSy&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;<span class="caret">|</span></div></div>
+    <div class="fhint">Prazno = ugradjeni podrazumevani kljuc. Nalepi svoj besplatni kljuc sa aistudio.google.com/apikey.</div>
+    <div class="sh">Language / Jezik</div>
+    <div class="chips"><span class="chip on">Srpski</span><span class="chip">Slovenscina</span><span class="chip">English</span></div>
+    <div class="callout" style="top:80px;left:150px">Dugo pritisni polje &#8594;<br><b>Paste / Nalepi</b>.</div>
+    <div class="callout" style="top:-2px;left:210px">Nazad (&#8249; ili prevlacenjem)<br>cuva unos.</div>
+  </div>
+</div>''',
+}
+# lang-ok-end
+
+CSS = '''
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Segoe UI",Roboto,system-ui,sans-serif}
+body{background:#0d1117;padding:0}
+.frame{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+.browser{width:720px}
+.phone{width:420px;border:10px solid #222;border-radius:34px}
+.bbar{background:#e9edf2;padding:12px 16px;display:flex;align-items:center;gap:7px}
+.dot{width:12px;height:12px;border-radius:50%}.dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+.url{margin-left:14px;background:#fff;border-radius:16px;padding:7px 18px;font-size:15px;color:#333;flex:1;border:1px solid #d5dbe2}
+.page{padding:40px;min-height:360px;position:relative;background:#fbfcfe}
+.page.center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+.big{font-size:22px;color:#333}.typed{font-size:26px;font-weight:700;color:#1a73e8;background:#eef4ff;padding:12px 24px;border-radius:10px;letter-spacing:.5px}
+.cap{color:#5f6b7a;font-size:16px}
+.gtitle{font-size:22px;font-weight:700;color:#1a73e8;margin-bottom:6px}
+.sub{font-size:19px;color:#333;margin:14px 0}
+.empty{color:#8a95a3;font-size:16px;margin:26px 0}
+.gbtn{background:#e8eefc;color:#1a73e8;border:none;padding:12px 22px;border-radius:9px;font-size:17px;font-weight:600;cursor:pointer}
+.gbtn.blue{background:#1a73e8;color:#fff}.big2{font-size:19px;padding:15px 26px}
+.modal{background:#fff;border:1px solid #e0e6ee;border-radius:14px;padding:28px;max-width:520px;box-shadow:0 4px 24px rgba(0,0,0,.1);position:relative;margin-top:10px}
+.mh{font-size:20px;font-weight:700;color:#222;margin-bottom:18px}
+.mrow{font-size:16px;color:#333;margin:12px 0;display:flex;align-items:center;gap:10px}
+.mrow2{font-size:14px;color:#8a95a3;margin:6px 0}
+.chk{display:inline-flex;width:22px;height:22px;background:#1a73e8;color:#fff;border-radius:5px;align-items:center;justify-content:center;font-size:14px;flex:none}
+.proj{border:1px solid #d5dbe2;border-radius:8px;padding:11px 14px;margin:8px 0 18px;color:#333;font-size:16px}
+.keyrow{display:flex;align-items:center;gap:12px;background:#f1f5fb;border-radius:9px;padding:14px 16px;margin:6px 0 12px}
+.keytext{font-family:"Consolas",monospace;font-size:16px;color:#333;flex:1;letter-spacing:1px;overflow:hidden}
+.copy{background:#1a73e8;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:15px;font-weight:600;white-space:nowrap}
+.mnote{color:#c0392b;font-size:14px}
+.callout{position:absolute;background:#ffca28;color:#1a1a1a;padding:10px 14px;border-radius:10px;font-size:15px;font-weight:600;line-height:1.35;box-shadow:0 4px 14px rgba(0,0,0,.3);max-width:260px;z-index:5}
+.callout b{color:#000}
+.pbar{background:#111;color:#eee;padding:16px 18px 16px 44px;font-size:17px;font-weight:600;position:relative}
+.pbar .arrow{position:absolute;left:16px;font-size:22px}
+.ppage{padding:22px;background:#0d1117;min-height:420px;position:relative}
+.sh{color:#7aa2ff;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px}
+.field{margin-bottom:6px}.flabel{color:#c9d3e0;font-size:14px;margin-bottom:6px}
+.fbox{background:#161b22;border:1px solid #30363d;border-radius:9px;padding:14px;color:#e6edf3;font-family:monospace;font-size:15px;letter-spacing:1px;overflow:hidden}
+.fbox.glow{border-color:#2f81f7;box-shadow:0 0 0 3px rgba(47,129,247,.25)}
+.caret{color:#2f81f7}
+.fhint{color:#8b949e;font-size:13px;margin:8px 2px 0;line-height:1.4}
+.chips{display:flex;gap:10px;margin-top:8px}
+.chip{background:#161b22;border:1px solid #30363d;color:#c9d3e0;padding:9px 16px;border-radius:20px;font-size:14px}
+.chip.on{background:#1f6feb;border-color:#1f6feb;color:#fff}
+'''
+
+def main():
+    body = ''.join('<div id="%s" class="shot">%s</div>' % (k, v) for k, v in SCREENS.items())
+    html = '<!doctype html><meta charset="utf-8"><style>%s .shot{display:inline-block;padding:24px}</style><body>%s</body>' % (CSS, body)
+    path = os.path.join(HERE, '_screens.html')
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(html)
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_context(device_scale_factor=2).new_page()
+        pg.goto('file:///' + path.replace('\\', '/'))
+        pg.wait_for_timeout(500)
+        for k in SCREENS:
+            el = pg.query_selector('[id="%s"] .frame' % k)
+            el.screenshot(path=os.path.join(SHOTS, k + '.png'))
+            print('shot', k)
+        b.close()
+
+if __name__ == '__main__':
+    main()
