@@ -55,6 +55,16 @@ installable: yes
 
 Full dated rationale for each of these: [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## Resource law (owner decree 2026-08-20)
+
+Nothing is taken for good. Mic, camera, SCO route, audio focus, wake listener,
+foreground service: acquired at the state transition that needs them, released
+by the transition that leaves it — never held "just in case", never by a
+daemon that outlives the user's intent. Every state has a working exit, and
+quit must always work (see "Quit is real"). Born of the 2026-08-19 wedge:
+one stuck state held camera + SCO + mic for 46+ minutes and survived
+swipe-close. Rationale: docs/DECISIONS.md (2026-08-20).
+
 ## How to build
 
 ```

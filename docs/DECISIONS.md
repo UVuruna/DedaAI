@@ -52,6 +52,20 @@ report each one came from live here — read the entry before arguing with it.
   gate had to learn his actual phrasing twice: "pravi apk" (2026-08-19,
   "apk" wasn't in the recognized word list) and "bill" (2026-08-19, his
   phone's voice keyboard turned "build" into "bill").
+- **2026-08-20** — Resource law: nothing is taken for good, nothing runs as
+  an unstoppable background daemon. Decreed after the glasses-mic forensic
+  session: the 2026-08-19 build (pre-rename package) wedged in its TALKING
+  state and held the camera stream + Bluetooth SCO + the mic foreground
+  service for 46+ minutes with no exit path, surviving swipe-close — the
+  owner's phone needed a night of ADB surgery before the glasses would even
+  pair again. (The glasses' dead microphone itself proved to be a physical
+  fault — a blocked acoustic inlet, measured and documented on 2026-08-20 —
+  but the wedge was real, ours, and is exactly what this law forbids.)
+  Standing rule for every future session: each resource is acquired by the
+  state transition that needs it and released by the transition that leaves
+  it; no acquisition without its release in the same state machine; every
+  state has a working exit; quit tears everything down. A held resource with
+  no live user intent behind it is a bug, even when nothing visibly breaks.
 - **2026-08-20** — No notification listener in the app, ever. Google Play
   Protect hard-blocks a sideloaded APK that declares one (“sensitive
   data”, no Install-anyway offered) — the owner hit exactly that dialog.

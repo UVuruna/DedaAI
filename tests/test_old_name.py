@@ -28,9 +28,10 @@ PROJECT = Path(__file__).resolve().parent.parent
 
 # android/ is owned and edited only inside its own session (scaffolding
 # brief zones); the two history docs are explicitly allowed to say what the
-# project used to be called.
+# project used to be called; this gate's own source necessarily names the
+# patterns it hunts, so it skips itself.
 SKIP_TOP_DIRS = {"android"}
-SKIP_FILES = {"docs/PLAN.md", "docs/DECISIONS.md"}
+SKIP_FILES = {"docs/PLAN.md", "docs/DECISIONS.md", "tests/test_old_name.py"}
 
 # Only used if `git ls-files` itself is unreachable (see `_tracked_files`).
 FALLBACK_SKIP_DIR_NAMES = {

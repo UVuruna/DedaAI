@@ -26,6 +26,32 @@ below fixed. Each line: what is unresolved and what would unblock it.
   the project's old location, `U:\Coding\Meta RayBan AI\` (where the project
   lived before its move into this repo as `android/`). It was locked and
   could not be deleted at the time of writing; delete it once it is free.
+- **Wake listening: which microphone — glasses, phone, or both? (owner will
+  decide; sketch only, decreed 2026-08-20 during the dead-glasses-mic
+  session).** The glasses' mic died physically and the product was deaf with
+  it; a phone-mic path would have kept Deda alive. Implementation sketch,
+  bound by the Resource law (CLAUDE.md — listen only on demand, release on
+  exit):
+  - Wake listener exists ONLY in standby, started by an explicit user action
+    (notification button, app, tap mode) and torn down on quit — never a
+    permanent daemon.
+  - Option A: a Settings choice — wake mic = Glasses / Phone / Both.
+  - Option B: no setting — always listen on both in standby, two detectors in
+    parallel (glasses SCO route + phone built-in mic), first to recognize the
+    phrase wins and its route carries the conversation.
+  - Either way, playback stays on the glasses' speakers; only the mic route
+    varies. A dead glasses mic then degrades the product to "phone-mic Deda"
+    instead of killing it.
+  - Key risk to verify FIRST on hardware: Android may not deliver two live
+    capture streams (SCO + built-in) at once — concurrent-capture rules and
+    `setPreferredDevice` behaviour decide whether Option B is even possible;
+    if not, Option A with a per-session fallback (glasses route fails →
+    offer phone mic) gives the same rescue.
+  - Battery cost of a held-open SCO link during standby is the other number
+    to measure before choosing.
+  - Relation to the 2026-08-18 "standby and music never mix" decree: that
+    decree rejected listening THROUGH music; it does not decide which mic
+    listens in normal standby, so this choice stays open without touching it.
 - **Guided hardware test of the MVP still pending.** The wake/standby/tap
   state machine and every item above need one owner-present, step-by-step
   test on the actual glasses + phone. Standing process rule since a
