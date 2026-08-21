@@ -5,14 +5,22 @@ below fixed. Each line: what is unresolved and what would unblock it.
 
 <!-- old-name-ok: OPEN-ISSUES.md names the old project path in the resolved
      leftover-checkout note below — see tests/test_old_name.py ALLOWED. -->
-- **Wake-word models trained but NOT integrated.** Both openWakeWord models
-  exist (`wakeword-training/models/`, exported to ONNX): `hej_deda` —
-  accuracy 0.78, recall 0.56; `cao_deda` — accuracy 0.86, recall 0.73. Both
-  recall numbers are weak (a real miss rate against the actual wake phrase),
-  so the app currently runs on a stop-gap instead: Android's own
-  `SpeechRecognizer` in a restart loop. Wiring the trained models in
-  (onnxruntime-android) needs an accuracy check on real SCO/glasses-mic
-  audio first — do not swap the stop-gap out blind.
+- **Wake-word models trained but NOT integrated, and the mixed-voice recipe
+  did NOT fix recall.** Measured 2026-08-22 on the held-out test features of
+  the fresh run (3,000 positives incl. 1,000 English-phonetic, 2,000
+  negatives): `hej_deda` recall **0.521** at threshold 0.5, false accepts
+  0.0025, accuracy 0.712 — against the previous Serbian-only 0.56. Serbian
+  clips alone reach 0.572, the English-phonetic ones only 0.421, so the extra
+  904 speakers were not the rescue they were meant to be. The scores are
+  **bimodal**: ~45 % of real wake clips score ~0.001, so no threshold rescues
+  them (recall only climbs to 0.612 at threshold 0.02, where false accepts
+  quadruple). Root cause found in the recipe itself, not in the data —
+  `target_false_positives_per_hour: 0.2` with `max_negative_weight: 1500`
+  makes the trainer buy silence with deafness. Retrain queued with the trade
+  shifted (1.0 FP/hr, negative weight 300, layer 96) reusing the same clips.
+  The app therefore still runs the stop-gap: Android's own `SpeechRecognizer`
+  in a restart loop. Wiring any model in (onnxruntime-android) needs a check
+  on real SCO/glasses-mic audio first — do not swap the stop-gap out blind.
 - **Slovenian TTS quality unverified.** Serbian pronunciation was confirmed
   acceptable on-device (2026-08-18, phone test); Slovenian has not had the
   same on-device listening pass yet.
@@ -65,9 +73,15 @@ below fixed. Each line: what is unresolved and what would unblock it.
   editable installs died with the old checkout's deletion (2026-08-21,
   caught by smoke, re-pointed same day). The English-phonetic companion
   configs (*_en.yaml) + merge stage are in; smoke of the mixed pipeline
-  gates the full overnight run. Real recordings from the owner (see
-  UV/snimanje-uzoraka.md) are the honest measurement set — no model
-  replaces the SpeechRecognizer stop-gap before passing it.
+  gates the full overnight run. The 2026-08-22 run merged 7,000 English
+  positives into `hej_deda` at full scale (the fix holds outside smoke) and
+  produced a model in 1 h 38 min. **The driver now measures what it built**
+  (`run_training.py --evaluate`): openWakeWord announces its own accuracy
+  through `logging.info`, which never reaches the driver's log, so the whole
+  point of the first overnight run was lost — a run must always end in a
+  number. Real recordings from the owner (see UV/snimanje-uzoraka.md) are
+  still the honest measurement set — no model replaces the SpeechRecognizer
+  stop-gap before passing it.
 - **Wake listening: which microphone — glasses, phone, or both? (owner will
   decide; sketch only, decreed 2026-08-20 during the dead-glasses-mic
   session).** The glasses' mic died physically and the product was deaf with

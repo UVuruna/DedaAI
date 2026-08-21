@@ -64,8 +64,16 @@ batch_n_per_class:
   "positive": 50
 
 model_type: "dnn"
-layer_size: 32
+layer_size: 96
 
 steps: 50000
-max_negative_weight: 1500
-target_false_positives_per_hour: 0.2
+max_negative_weight: 300
+# Recall-vs-false-accepts trade, measured 2026-08-22 (do not tighten blind).
+# With target_false_positives_per_hour 0.2 / max_negative_weight 1500 the
+# trainer bought silence with deafness: hej_deda scored recall 0.521 at
+# threshold 0.5 while accepting only 0.25% of the negative test set, and the
+# scores were bimodal (45% of real "Hej Deda" clips scored ~0.001, so no
+# threshold rescues them). Standby is short and user-started, so one spurious
+# wake per hour costs a 15 s silence timeout -- a missed wake costs the
+# product. Trade shifted here; measure again with run_training.py --evaluate.
+target_false_positives_per_hour: 1.0

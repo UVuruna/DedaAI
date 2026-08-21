@@ -198,6 +198,33 @@ def merge_positives(src_root, dst_root):
     return copied
 
 
+def en_clips_complete(en_root, conf_en):
+    """Did the EN pass actually put its clips on disk? (train.py's own resume
+    rule: >95 % of target counts as done.)
+
+    The EN pass MUST be judged by the disk, never by the exit code. It loads
+    the piper `.pt` VITS voice on CUDA in the same process that
+    openwakeword/data.py imports speechbrain into, and on Windows that pair
+    fastfails ucrtbase.dll with 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN)
+    during DLL detach -- AFTER every clip is written and closed, with no
+    Python traceback and no exit path (not even os._exit) able to dodge it.
+    Measured 2026-08-21: clips 30/10/30/10 on disk, rc=3221226505; the same
+    command with CUDA disabled exits 0, and the Serbian pass never trips it
+    because its voice is an .onnx. Judging by rc alone silently threw away
+    every English voice -- the whole point of the recipe.
+    """
+    want = {'positive_train': conf_en['n_samples'],
+            'positive_test': conf_en['n_samples_val']}
+    have = {}
+    for sub in ('positive_train', 'positive_test'):
+        d = os.path.join(en_root, sub)
+        have[sub] = (len([n for n in os.listdir(d) if n.endswith('.wav')])
+                     if os.path.isdir(d) else 0)
+    short = {k: '%d/%d' % (have[k], v)
+             for k, v in want.items() if have[k] < 0.95 * v}
+    return (not short), have, short
+
+
 def generate_english_positives(main_cfg, conf_main):
     """Generation-only run of the *_en.yaml companion, merged into the main
     model's clips. Missing voice or a failed generation degrades to the
@@ -227,9 +254,15 @@ def generate_english_positives(main_cfg, conf_main):
         [PY, TRAIN, '--training_config', en_cfg, '--generate_clips'],
         cwd=BASE, env=env)
     log('rc=%d' % rc)
-    if rc != 0:
-        log('EN generation FAILED -- continuing with Serbian-only positives')
+    ok, have, short = en_clips_complete(en_root, conf_en)
+    if not ok:
+        log('EN generation FAILED (rc=%d, short: %s) -- continuing with '
+            'Serbian-only positives' % (rc, short))
         return
+    if rc != 0:
+        log('EN generation exited rc=%d (0x%08X) but every clip is on disk '
+            '(%s) -- known teardown fastfail, merging anyway'
+            % (rc, rc & 0xFFFFFFFF, have))
     n = merge_positives(en_root, dst_root)
     with open(marker, 'w', encoding='utf-8') as f:
         f.write('merged %d clips\n' % n)
@@ -305,10 +338,74 @@ def train(cfg):
             return False
     ok = os.path.exists(onnx)
     log('%s: %s' % (cfg, ('DONE -> ' + onnx) if ok else 'finished but no .onnx found!'))
+    if ok:
+        try:
+            evaluate(cfg)
+        except Exception as e:   # a lost number must not lose the model
+            log('evaluate %s failed: %s' % (cfg, e))
     return ok
 
 
+def evaluate(cfg, thresholds=(0.5, 0.7, 0.9)):
+    """Measure the finished .onnx and WRITE THE NUMBER DOWN.
+
+    openWakeWord's trainer computes accuracy/recall itself but announces them
+    through logging.info, which never reaches this driver's log -- the whole
+    point of an overnight run was silently lost on 2026-08-21. The driver
+    therefore scores the exported model on the same held-out features the
+    trainer used (positive_features_test / negative_features_test) and logs
+    recall + false-accept rate per threshold, so a run always ends in a
+    number. Synthetic clips only: the honest measurement set is still the
+    owner's real recordings (UV/snimanje-uzoraka.md).
+    """
+    import numpy as np
+    import onnxruntime as ort
+    import yaml
+    with open(os.path.join(BASE, cfg), encoding='utf-8') as f:
+        conf = yaml.safe_load(f)
+    name = conf['model_name']
+    outdir = os.path.normpath(os.path.join(BASE, conf['output_dir']))
+    onnx = os.path.join(outdir, name + '.onnx')
+    clip_root = os.path.join(outdir, name)
+    pos_f = os.path.join(clip_root, 'positive_features_test.npy')
+    neg_f = os.path.join(clip_root, 'negative_features_test.npy')
+    for f in (onnx, pos_f, neg_f):
+        if not os.path.exists(f):
+            log('evaluate %s: missing %s -- no number this run' % (name, f))
+            return None
+    sess = ort.InferenceSession(onnx, providers=['CPUExecutionProvider'])
+    inp = sess.get_inputs()[0].name
+
+    def scores(path):
+        feats = np.load(path, mmap_mode='r')
+        out = np.empty(len(feats), dtype='float32')
+        for i in range(len(feats)):
+            x = np.asarray(feats[i], dtype='float32')[None, ...]
+            out[i] = sess.run(None, {inp: x})[0].ravel()[0]
+        return out
+
+    pos, neg = scores(pos_f), scores(neg_f)
+    log('evaluate %s: %d positive / %d negative held-out clips'
+        % (name, len(pos), len(neg)))
+    best = None
+    for th in thresholds:
+        recall = float((pos >= th).mean())
+        false_accept = float((neg >= th).mean())
+        accuracy = float(((pos >= th).sum() + (neg < th).sum()) / (len(pos) + len(neg)))
+        log('evaluate %s: threshold %.2f -> recall %.3f, false accepts %.3f, '
+            'accuracy %.3f' % (name, th, recall, false_accept, accuracy))
+        if best is None:
+            best = (th, recall, false_accept, accuracy)
+    return best
+
+
 def main():
+    if '--evaluate' in sys.argv:
+        cfgs = sys.argv[sys.argv.index('--evaluate') + 1:]
+        cfgs = cfgs or ['hej_deda.yaml', 'cao_deda.yaml']
+        for cfg in cfgs:
+            evaluate(cfg)
+        return 0
     if '--smoke' in sys.argv:
         log('=== smoke-only run ===')
         clear_dir_contents(os.path.join(BASE, 'output_smoke_deda'))
