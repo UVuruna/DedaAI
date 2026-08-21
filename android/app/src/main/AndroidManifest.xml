@@ -16,6 +16,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- In-app self-update: hand the downloaded release APK to Android's
+         package installer (Obtainium/F-Droid pattern). The user still
+         confirms every install in the system dialog. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -77,5 +81,16 @@
              ("sensitive data", no Install-anyway button). It only served
              handing single taps back to the music app; music resume now rides
              the transient audio-focus contract instead. -->
+
+        <!-- Installing a self-update kills the process — this manifest-declared
+             receiver is the only way to hear that it finished and invite the
+             user back in (activity start when allowed, notification always). -->
+        <receiver
+            android:name=".update.UpdateReturnReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

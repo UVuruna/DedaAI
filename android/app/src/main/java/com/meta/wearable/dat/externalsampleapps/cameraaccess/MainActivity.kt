@@ -27,6 +27,7 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.CameraAccessScaffold
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.update.UpdateChecker
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellableContinuation
@@ -71,6 +72,9 @@ class MainActivity : ComponentActivity() {
     // Deda's button service lives as long as the app is installed and running:
     // it is what makes the glasses' double tap reach us while Deda sleeps.
     GlassesButtonService.start(this)
+    // One throttled look for a newer release — opening the app is the only
+    // automatic trigger (resource law: no polling daemon).
+    UpdateChecker.checkOnAppOpen()
 
     // Keep screen on while streaming
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

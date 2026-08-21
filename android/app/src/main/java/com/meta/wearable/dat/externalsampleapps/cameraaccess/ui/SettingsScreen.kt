@@ -40,8 +40,10 @@ import androidx.compose.ui.unit.dp
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.assistant.AssistantLanguage
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.DedaActivationMode
+import androidx.compose.runtime.collectAsState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.VideoFrameMode
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.update.UpdateChecker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -250,6 +252,57 @@ fun SettingsScreen(
                 }) {
                     Text("Restore default for " + language.displayName)
                 }
+            }
+
+            SectionHeader("App")
+            // lang-ok-begin: user-facing update-check texts, per assistant language
+            val checkLabel = when (language) {
+                AssistantLanguage.SERBIAN -> "Proveri da li ima nova verzija"
+                AssistantLanguage.SLOVENIAN -> "Preveri, ali obstaja nova različica"
+                AssistantLanguage.ENGLISH -> "Check for a new version"
+            }
+            val latestLabel = when (language) {
+                AssistantLanguage.SERBIAN -> "Imaš najnoviju verziju."
+                AssistantLanguage.SLOVENIAN -> "Imaš najnovejšo različico."
+                AssistantLanguage.ENGLISH -> "You have the latest version."
+            }
+            val checkFailedLabel = when (language) {
+                AssistantLanguage.SERBIAN -> "Provera nije uspela — proveri internet."
+                AssistantLanguage.SLOVENIAN -> "Preverjanje ni uspelo — preveri internet."
+                AssistantLanguage.ENGLISH -> "Check failed — check your connection."
+            }
+            // lang-ok-end
+            Hint("DedaAI " + com.meta.wearable.dat.externalsampleapps.cameraaccess.BuildConfig.VERSION_NAME)
+            var checkResult by remember { mutableStateOf<String?>(null) }
+            Button(
+                onClick = {
+                    checkResult = null
+                    UpdateChecker.checkNow { found, failed ->
+                        // A found update surfaces as the install banner below
+                        // (and on the Home screen) — no extra text needed then.
+                        checkResult = when {
+                            failed -> checkFailedLabel
+                            found -> null
+                            else -> latestLabel
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("⟳  $checkLabel") }
+            checkResult?.let { Hint(it) }
+            val update by UpdateChecker.available.collectAsState()
+            val updateBusy by UpdateChecker.busy.collectAsState()
+            update?.let { u ->
+                val texts = com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.Greeter.Texts.forCurrentLanguage()
+                Button(
+                    onClick = {
+                        UpdateChecker.downloadAndInstall(context) {
+                            checkResult = texts.updateError
+                        }
+                    },
+                    enabled = !updateBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("⬇  " + texts.updateAvailable.format(u.versionName)) }
             }
 
             TextButton(onClick = { showResetDialog = true }) {

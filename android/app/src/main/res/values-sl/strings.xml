@@ -16,5 +16,7 @@
     <string name="deda_notif_access_hint">Da en dotik še naprej upravlja glasbo, dovoli Dedi dostop do obvestil.</string>
     <string name="deda_allow_notif_access">Dovoli dostop do obvestil</string>
     <string name="deda_quit_app">Zapri aplikacijo</string>
+    <string name="deda_update_available">Nova različica %1$s — posodobi</string><!-- lang-ok: values-sl translation file -->
+    <string name="deda_update_error">Posodobitev ni uspela — poskusi znova</string><!-- lang-ok: values-sl translation file -->
     <!-- lang-ok-end -->
 </resources>

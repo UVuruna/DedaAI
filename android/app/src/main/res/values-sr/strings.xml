@@ -16,5 +16,7 @@
     <string name="deda_notif_access_hint">Da bi jedan tap i dalje kontrolisao muziku, dozvoli Dedi pristup notifikacijama.</string>
     <string name="deda_allow_notif_access">Dozvoli pristup notifikacijama</string>
     <string name="deda_quit_app">Ugasi aplikaciju</string>
+    <string name="deda_update_available">Nova verzija %1$s — ažuriraj</string><!-- lang-ok: values-sr translation file -->
+    <string name="deda_update_error">Ažuriranje nije uspelo — pokušaj ponovo</string><!-- lang-ok: values-sr translation file -->
     <!-- lang-ok-end -->
 </resources>

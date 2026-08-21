@@ -50,6 +50,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.Greeter
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.update.UpdateChecker
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
 @Composable
@@ -145,6 +146,23 @@ fun HomeScreen(
         // Deda standby switch — same thing the glasses' double tap does.
         val dedaMode by DedaState.mode.collectAsState()
         val dedaTexts = Greeter.Texts.forCurrentLanguage()
+
+        // A newer published release (checked on app open / in Settings):
+        // one tap downloads it and opens Android's installer (owner's order
+        // 2026-08-21 — updates must reach users through the app itself).
+        val update by UpdateChecker.available.collectAsState()
+        val updateBusy by UpdateChecker.busy.collectAsState()
+        update?.let { u ->
+          SwitchButton(
+              label = if (updateBusy) "⌛ " + dedaTexts.updateAvailable.format(u.versionName)
+                      else dedaTexts.updateAvailable.format(u.versionName),
+              onClick = {
+                UpdateChecker.downloadAndInstall(context) {
+                  Toast.makeText(context, dedaTexts.updateError, Toast.LENGTH_LONG).show()
+                }
+              },
+          )
+        }
         SwitchButton(
             label = if (dedaMode == DedaMode.OFF) dedaTexts.switchOff else dedaTexts.switchOn,
             onClick = { viewModel.toggleDeda() },

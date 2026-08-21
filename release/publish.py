@@ -13,7 +13,9 @@ repo (UVuruna/DedaAI) holds only the install guide and QR — no source.
 Run via publish.cmd after every build. Requires `gh` authenticated as the
 owner (it already is on this PC).
 """
+import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -46,13 +48,29 @@ def main():
     import shutil
     shutil.copy2(APK_SRC, staged)
 
-    rc = subprocess.call(['gh', 'release', 'create', tag, staged,
+    # deda-version.json rides next to the APK on the same stable URL — the
+    # app's in-app updater (UpdateChecker) compares its versionCode with its
+    # own and offers the update. Read from the gradle file so the numbers
+    # can never drift from what was just built.
+    gradle_file = os.path.join(HERE, '..', 'android', 'app', 'build.gradle.kts')
+    with open(gradle_file, encoding='utf-8') as f:
+        gradle = f.read()
+    version_code = int(re.search(r'versionCode\s*=\s*(\d+)', gradle).group(1))
+    version_name = re.search(r'versionName\s*=\s*"([^"]+)"', gradle).group(1)
+    vjson = os.path.join(HERE, 'deda-version.json')
+    with open(vjson, 'w', encoding='utf-8') as f:
+        json.dump({'versionCode': version_code,
+                   'versionName': version_name,
+                   'notes': notes}, f, ensure_ascii=False)
+
+    rc = subprocess.call(['gh', 'release', 'create', tag, staged, vjson,
                           '--repo', REPO, '--title', title, '--notes', notes])
     if rc != 0:
-        # Same tag already exists (rebuild within one minute) — replace asset.
-        rc = subprocess.call(['gh', 'release', 'upload', tag, staged,
+        # Same tag already exists (rebuild within one minute) — replace assets.
+        rc = subprocess.call(['gh', 'release', 'upload', tag, staged, vjson,
                               '--repo', REPO, '--clobber'])
     os.remove(staged)
+    os.remove(vjson)
     if rc != 0:
         log('publish FAILED: gh exited with %d' % rc)
         return rc

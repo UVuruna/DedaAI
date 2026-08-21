@@ -42,6 +42,11 @@ object SettingsManager {
         get() = prefs.getInt("dedaSilenceTimeoutSec", 15)
         set(value) = prefs.edit().putInt("dedaSilenceTimeoutSec", value.coerceIn(5, 600)).apply()
 
+    /** When the update check last ran — UpdateChecker throttles the app-open check with this. */
+    var updateLastCheckAt: Long
+        get() = prefs.getLong("updateLastCheckAt", 0L)
+        set(value) = prefs.edit().putLong("updateLastCheckAt", value).apply()
+
     // dedaMaxSessionMin (the forced session cap) was removed on purpose: a
     // conversation ends ONLY by the stop phrase, the silence timeout above,
     // or Google's own session limit (owner decree 2026-08-19).

@@ -65,6 +65,8 @@
     <string name="deda_notif_access_hint" description="Why notification access is needed">For single tap to keep controlling music, allow Deda notification access.</string>
     <string name="deda_allow_notif_access" description="Button opening notification access settings">Allow notification access</string>
     <string name="deda_quit_app" description="Notification action + home button: quit the whole app">Quit the app</string>
+    <string name="deda_update_available" description="Home banner when a newer release exists; %1$s is the version">New version %1$s — update</string>
+    <string name="deda_update_error" description="Toast when the update download/install fails">Update failed — try again</string>
 
     <!-- Getting Started Sheet -->
     <string name="getting_started_title" description="Getting Started sheet title">Getting started</string>

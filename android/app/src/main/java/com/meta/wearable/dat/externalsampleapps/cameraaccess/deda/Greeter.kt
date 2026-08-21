@@ -55,6 +55,8 @@ class Greeter(context: Context) {
         val notifAccessHint: String,
         val allowNotifAccess: String,
         val quitApp: String,
+        val updateAvailable: String,
+        val updateError: String,
     ) {
         companion object {
             fun forCurrentLanguage(): Texts {
@@ -78,6 +80,8 @@ class Greeter(context: Context) {
                     notifAccessHint = ctx.getString(R.string.deda_notif_access_hint),
                     allowNotifAccess = ctx.getString(R.string.deda_allow_notif_access),
                     quitApp = ctx.getString(R.string.deda_quit_app),
+                    updateAvailable = ctx.getString(R.string.deda_update_available),
+                    updateError = ctx.getString(R.string.deda_update_error),
                 )
             }
         }
