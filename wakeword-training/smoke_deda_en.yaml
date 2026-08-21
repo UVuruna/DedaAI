@@ -1,0 +1,52 @@
+# SMOKE for the English-phonetic generation pass — toy numbers, same shape
+# as hej_deda_en.yaml. The smoke run must prove generate->merge->resample->
+# augment->train end-to-end with BOTH voices before any hours-long run
+# (owner's rule 2026-08-19).
+
+model_name: "smoke_deda_en"
+
+# lang-ok-begin: phonetic respelling IS the TTS input text
+target_phrase:
+  - "hey dedda"
+
+custom_negative_phrases:
+  - "hey dad"
+# lang-ok-end
+
+n_samples: 30
+n_samples_val: 10
+
+tts_batch_size: 50
+augmentation_batch_size: 16
+
+piper_sample_generator_path: "./piper-sample-generator"
+
+output_dir: "./output_smoke_deda_en"
+
+rir_paths:
+  - "./data/mit_rirs"
+
+background_paths:
+  - "./data/audioset_16k"
+
+background_paths_duplication_rate:
+  - 1
+
+false_positive_validation_data_path: "./data/validation_set_features.npy"
+
+augmentation_rounds: 1
+
+feature_data_files:
+  "ACAV100M_sample": "./data/openwakeword_features_ACAV100M_2000_hrs_16bit.npy"
+
+batch_n_per_class:
+  "ACAV100M_sample": 256
+  "adversarial_negative": 20
+  "positive": 20
+
+model_type: "dnn"
+layer_size: 32
+
+steps: 300
+max_negative_weight: 1500
+target_false_positives_per_hour: 0.2

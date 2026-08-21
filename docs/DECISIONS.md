@@ -72,6 +72,32 @@ report each one came from live here — read the entry before arguing with it.
   it; no acquisition without its release in the same state machine; every
   state has a working exit; quit tears everything down. A held resource with
   no live user intent behind it is a bug, even when nothing visibly breaks.
+- **2026-08-21** — Personas are DELIVERY, never CONTENT. Two personality
+  styles (an analyst type; the second under choice) give the same factual
+  answer in different tones — no folk-grandma simulation, no invented
+  advice, no pet names ever (the user's gender is unknown). Implemented as
+  internal prompt addenda; the system prompt and similar machinery are
+  hidden from Settings — an ordinary user must neither see nor edit them
+  (the prompt editor was removed the same day).
+- **2026-08-21** — "Journal" (working name; the word "Companion" is
+  retired) is PASSIVE: it talks to no one, it collects — periodic one-shot
+  photos and the content of whatever Deda sessions happen while it runs —
+  into a day diary. Sessions start and stop freely while it is on; photo
+  capture pauses during a conversation (camera + glasses mic never mix).
+- **2026-08-21** — Voice commands ship without message READING, and SMS
+  send is confirmation-gated. RECEIVE_SMS/READ_SMS sit on Google's own
+  Play Protect sideload hard-block list (the notification-listener bucket
+  that already burned an install), so reading incoming messages is out —
+  not probed, out. Sending goes: dictate → read back → a clear yes → send;
+  the read-back rule lives in the model's standing instructions.
+- **2026-08-21** — Wake-word recipe: mixed voices. The weak recall (hej
+  0.56 / cao 0.73) came from a 2-speaker Serbian TTS as the only positive
+  source; the standing recipe adds ~900 libritts_r English speakers
+  pronouncing PHONETIC RESPELLINGS of the phrases ("hey dedda", "chow
+  dedda" — the owner's own idea: write the word the way an English reader
+  would say it), plus the owner's real recordings as the honest
+  measurement set. No model replaces the SpeechRecognizer stop-gap until
+  it passes that measurement on glasses-mic audio.
 - **2026-08-20** — No notification listener in the app, ever. Google Play
   Protect hard-blocks a sideloaded APK that declares one (“sensitive
   data”, no Install-anyway offered) — the owner hit exactly that dialog.

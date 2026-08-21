@@ -1,0 +1,62 @@
+# English-phonetic positive generation for "Hej Deda" (owner's order
+# 2026-08-21): the Serbian voice has only 2 speakers and recall suffered
+# (0.56). libritts_r brings ~904 English speakers; these respellings make
+# them pronounce the Serbian phrase. GENERATION-ONLY config — run_training.py
+# runs just --generate_clips with PIPER_SAMPLE_MODEL pointing at the English
+# voice, then merges positive_train/positive_test into output_hej_deda before
+# augmentation. Tune the spellings by listening to a few generated clips.
+
+model_name: "hej_deda_en"
+
+# lang-ok-begin: phonetic respellings ARE the TTS input text
+target_phrase:
+  - "hey dedda"
+  - "hey deh dah"
+  - "hey dead ah"
+
+# English near-misses for the adversarial negatives of this pass.
+custom_negative_phrases:
+  - "hey dad"
+  - "hey buddy"
+  - "hey there"
+  - "hey deck"
+  - "hey data"
+# lang-ok-end
+
+n_samples: 6000
+n_samples_val: 1000
+
+tts_batch_size: 50
+augmentation_batch_size: 16
+
+piper_sample_generator_path: "./piper-sample-generator"
+
+output_dir: "./output_hej_deda_en"
+
+rir_paths:
+  - "./data/mit_rirs"
+
+background_paths:
+  - "./data/audioset_16k"
+
+background_paths_duplication_rate:
+  - 1
+
+false_positive_validation_data_path: "./data/validation_set_features.npy"
+
+augmentation_rounds: 1
+
+feature_data_files:
+  "ACAV100M_sample": "./data/openwakeword_features_ACAV100M_2000_hrs_16bit.npy"
+
+batch_n_per_class:
+  "ACAV100M_sample": 1024
+  "adversarial_negative": 50
+  "positive": 50
+
+model_type: "dnn"
+layer_size: 32
+
+steps: 50000
+max_negative_weight: 1500
+target_false_positives_per_hour: 0.2

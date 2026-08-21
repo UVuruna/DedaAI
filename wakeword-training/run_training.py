@@ -148,6 +148,93 @@ def dl_features():
 FEATURE_NPYS = ('positive_features_train', 'negative_features_train',
                 'positive_features_test', 'negative_features_test')
 
+# ---- English-phonetic positives (owner's order 2026-08-21) ------------------
+# The Serbian voice has only 2 speakers and recall paid for it (hej 0.56 /
+# cao 0.73). libritts_r brings ~904 English speakers; the *_en.yaml configs
+# make them pronounce the Serbian phrases through respellings ("hey dedda",
+# "chow dedda"). Their positive clips merge into the main model's clip dirs
+# BEFORE augmentation, so one model trains on both voices' positives.
+
+EN_VOICE = os.path.join('piper-sample-generator', 'models',
+                        'en_US-libritts_r-medium.pt')
+EN_MIX = {
+    'hej_deda.yaml': 'hej_deda_en.yaml',
+    'cao_deda.yaml': 'cao_deda_en.yaml',
+    'smoke_deda.yaml': 'smoke_deda_en.yaml',
+}
+
+
+def clear_dir_contents(path):
+    """Empty a directory WITHOUT removing the directory itself — the output
+    dirs are junctions to V:\\DedaAI (2026-08-21) and rmtree on a junction
+    would tear the link down instead of the data behind it."""
+    if not os.path.isdir(path):
+        return
+    for name in os.listdir(path):
+        p = os.path.join(path, name)
+        if os.path.isdir(p) and not os.path.islink(p):
+            shutil.rmtree(p, ignore_errors=True)
+        else:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+
+
+def merge_positives(src_root, dst_root):
+    """Copy the English pass's positive clips into the main clip dirs, with a
+    prefix so the two generations can never collide or overwrite."""
+    copied = 0
+    for sub in ('positive_train', 'positive_test'):
+        s = os.path.join(src_root, sub)
+        d = os.path.join(dst_root, sub)
+        if not os.path.isdir(s):
+            continue
+        os.makedirs(d, exist_ok=True)
+        for name in os.listdir(s):
+            if name.endswith('.wav'):
+                shutil.copy2(os.path.join(s, name), os.path.join(d, 'en_' + name))
+                copied += 1
+    return copied
+
+
+def generate_english_positives(main_cfg, conf_main):
+    """Generation-only run of the *_en.yaml companion, merged into the main
+    model's clips. Missing voice or a failed generation degrades to the
+    Serbian-only behaviour instead of killing the run."""
+    import yaml
+    en_cfg = EN_MIX.get(main_cfg)
+    if not en_cfg or not os.path.exists(os.path.join(BASE, en_cfg)):
+        return
+    if not os.path.exists(os.path.join(BASE, EN_VOICE)):
+        log('EN voice missing (%s) -- Serbian-only positives this run' % EN_VOICE)
+        return
+    with open(os.path.join(BASE, en_cfg), encoding='utf-8') as f:
+        conf_en = yaml.safe_load(f)
+    en_root = os.path.join(
+        os.path.normpath(os.path.join(BASE, conf_en['output_dir'])),
+        conf_en['model_name'])
+    dst_root = os.path.join(
+        os.path.normpath(os.path.join(BASE, conf_main['output_dir'])),
+        conf_main['model_name'])
+    marker = os.path.join(en_root, '.merged')
+    if os.path.exists(marker):
+        log('EN positives already merged for %s' % main_cfg)
+        return
+    env = dict(os.environ, PIPER_SAMPLE_MODEL=os.path.join(BASE, EN_VOICE))
+    log('EN positives: generating via %s (libritts_r, ~904 speakers)...' % en_cfg)
+    rc = subprocess.call(
+        [PY, TRAIN, '--training_config', en_cfg, '--generate_clips'],
+        cwd=BASE, env=env)
+    log('rc=%d' % rc)
+    if rc != 0:
+        log('EN generation FAILED -- continuing with Serbian-only positives')
+        return
+    n = merge_positives(en_root, dst_root)
+    with open(marker, 'w', encoding='utf-8') as f:
+        f.write('merged %d clips\n' % n)
+    log('EN positives: merged %d clips into %s' % (n, dst_root))
+
 
 def ensure_16k(clip_root):
     """openWakeWord expects 16 kHz clips but the Serbian piper voice renders
@@ -210,6 +297,7 @@ def train(cfg):
         return True
     for stage in ('--generate_clips', '--augment_clips', '--train_model'):
         if stage == '--augment_clips':
+            generate_english_positives(cfg, conf)  # extra voices join first
             ensure_16k(clip_root)          # piper renders 22050; oww wants 16k
             drop_partial_features(clip_root)  # crash leftovers fool the skip
         if run([PY, TRAIN, '--training_config', cfg, stage]) != 0:
@@ -223,10 +311,18 @@ def train(cfg):
 def main():
     if '--smoke' in sys.argv:
         log('=== smoke-only run ===')
-        shutil.rmtree(os.path.join(BASE, 'output_smoke_deda'), ignore_errors=True)
+        clear_dir_contents(os.path.join(BASE, 'output_smoke_deda'))
+        clear_dir_contents(os.path.join(BASE, 'output_smoke_deda_en'))
         ok = train('smoke_deda.yaml')
         log('=== smoke %s ===' % ('PASSED' if ok else 'FAILED'))
         return 0 if ok else 1
+    if '--fresh' in sys.argv:
+        # A retrain on purpose (new recipe): forget the finished models and
+        # their clips so train() cannot skip on the old .onnx.
+        for d in ('output_hej_deda', 'output_hej_deda_en',
+                  'output_cao_deda', 'output_cao_deda_en'):
+            log('fresh: clearing %s' % d)
+            clear_dir_contents(os.path.join(BASE, d))
     log('=== wake-word training driver started ===')
     free = shutil.disk_usage(BASE).free / 1e9
     log('free disk on this drive: %.1f GB' % free)
@@ -243,7 +339,8 @@ def main():
     dl_features()
     # Owner's rule (2026-08-19): the whole pipeline must pass at toy scale
     # before any hours-long run. Fresh smoke every time -- it is minutes.
-    shutil.rmtree(os.path.join(BASE, 'output_smoke_deda'), ignore_errors=True)
+    clear_dir_contents(os.path.join(BASE, 'output_smoke_deda'))
+    clear_dir_contents(os.path.join(BASE, 'output_smoke_deda_en'))
     if not train('smoke_deda.yaml'):
         log('SMOKE FAILED -- real training NOT started')
         return 1

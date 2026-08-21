@@ -28,15 +28,37 @@ below fixed. Each line: what is unresolved and what would unblock it.
   NOTE: the pre-move git history (the 15 commits from before the monorepo
   move) lived only in that checkout and was not bundled first — it is
   gone with the folder.
-- **Android Developer Verification threatens the whole sideload model
-  (flagged 2026-08-21, needs its own research pass).** Google begins
-  requiring registered/verified developer identity for ALL installed apps
-  — sideloaded included — on certified devices: Brazil/Indonesia/
-  Singapore/Thailand from September 2026, globally through 2027+. DedaAI
-  distributes exclusively by GitHub-release sideload; unaddressed, updates
-  (and first installs) may start being refused on users' phones. What
-  unblocks: a dedicated research session on the verification program's
-  actual requirements for a hobby developer, before the global rollout.
+- **Android Developer Verification — researched 2026-08-21, no urgent
+  deadline for THIS project.** The Sept 30 2026 enforcement covers only 7
+  named stores in BR/ID/SG/TH — direct sideloads like ours are explicitly
+  out of scope "yet"; the global phase is undated ("2027 and beyond").
+  There is a FREE "Limited Distribution" hobbyist tier (no ID, no fee, up
+  to 20 devices authorized by QR/link; the developer's name is not shown
+  to users), generally available since Aug 2026. Standing plan: register
+  the free tier + DedaAI's package name and signing-key SHA-256 at leisure
+  before the global phase, then authorize the handful of family devices;
+  re-check the program page through 2027 — an unregistered app's UPDATES
+  fail once enforcement reaches a device, so this must land before that
+  day. What unblocks: the owner's word to register (needs his Google
+  account with 2-step verification and a Payments profile).
+- **Voice commands (0.1.3) need their sideload probe on the owner's
+  phone.** In one guided pass: (1) 0.1.3 installs cleanly with
+  CALL_PHONE/READ_CONTACTS/SEND_SMS declared (none are on the hard-block
+  list — F-Droid dialer precedent — but this is our first probe); (2) the
+  SMS "Allow restricted settings" one-time step — record the exact path
+  Samsung shows; (3) call audio actually reaches the glasses (a One UI
+  8.5 Qualcomm BT bug is documented on this phone family); (4) dual-SIM:
+  without a chosen PhoneAccount the system SIM picker may appear —
+  decide if v2 needs the picker-bypass (READ_PHONE_STATE); (5) "take a
+  picture" during a glasses-mic session — unproven against the
+  camera-mutes-mic regression, so the command stayed out of 0.1.3.
+- **Wake-word retraining runs on the new mixed recipe.** The venv's
+  editable installs died with the old checkout's deletion (2026-08-21,
+  caught by smoke, re-pointed same day). The English-phonetic companion
+  configs (*_en.yaml) + merge stage are in; smoke of the mixed pipeline
+  gates the full overnight run. Real recordings from the owner (see
+  UV/snimanje-uzoraka.md) are the honest measurement set — no model
+  replaces the SpeechRecognizer stop-gap before passing it.
 - **Wake listening: which microphone — glasses, phone, or both? (owner will
   decide; sketch only, decreed 2026-08-20 during the dead-glasses-mic
   session).** The glasses' mic died physically and the product was deaf with

@@ -81,24 +81,48 @@ in the app yet. The dated reasoning behind each design lives in
   installer opens over it. No background polling; the check runs only when
   the user opens the app or asks for it.
 
-## 7. Settings
+## 7. Voice commands (0.1.3)
+
+- **Off by default** — a Settings toggle turns them on and asks for their
+  permissions (call, contacts, SMS). While off, the tools are not even
+  declared to the model.
+- **Call someone.** Spoken name → address-book lookup; several matches
+  become a spoken numbered list to pick from. The call is placed directly,
+  its audio rides the glasses like any headset call, and Deda steps aside
+  (turns off, releasing the audio route) once the call starts.
+- **Send an SMS.** Dictate → Deda reads the message back → only a clear
+  spoken yes sends it. No confirmation, no send — enforced in the model's
+  standing instructions.
+- **Alarms, timers, navigation.** Set hands-free through the phone's own
+  clock app; "navigate to..." starts turn-by-turn guidance that speaks
+  through the glasses, with Deda stepping aside after the handoff.
+- **Honesty rule.** Every tool reports a status; a failed or unpermitted
+  action is said plainly, never pretended. Reading INCOMING messages is
+  deliberately absent: the permissions it needs sit on Google's sideload
+  hard-block list (see [OPEN-ISSUES.md](OPEN-ISSUES.md)).
+
+## 8. Settings
 
 - Gemini API key (only the user's own text is ever shown) · assistant
   language · camera mode per conversation · microphone route (glasses /
   phone) · activation mode (glasses tap / notification button) · silence
-  timeout · editable system prompt with per-language default · reset.
+  timeout · voice commands on/off · reset. Internal machinery (system
+  prompts, persona style texts) is deliberately NOT exposed to users.
 
-## 8. Planned — designed, not in the app yet
+## 9. Planned — designed, not in the app yet
 
-- **Trained wake-word models.** Two openWakeWord models (hej_deda,
-  cao_deda) are trained and exported; the shipping stop-gap is Android's
-  `SpeechRecognizer`. Integration waits on an accuracy pass on real
-  glasses-mic audio (see [OPEN-ISSUES.md](OPEN-ISSUES.md)).
-- **Voice commands** — "pozovi" (call) and "pošalji poruku" (send a message), <!-- lang-ok: the commands' fixed Serbian names -->
-  and a wider zero-permission set (reminders, navigation); scoped by an
-  ongoing feasibility investigation (Play Protect limits included).
-- **Baba** — a second persona with a female voice and her own character,
-  woken by her own phrase ("Hej Baba").
-- **Companion mode** — periodic one-shot photos building a day diary with
-  recall ("what happened today", "where did I leave..."), session-based,
-  battery-honest; proposal under review.
+- **Trained wake-word models.** Two openWakeWord models exist but their
+  recall was weak; a new mixed-voice training recipe (Serbian voice +
+  ~900 English voices pronouncing phonetic respellings) plus the owner's
+  real recordings is in progress. The shipping stop-gap is Android's
+  `SpeechRecognizer` (see [OPEN-ISSUES.md](OPEN-ISSUES.md)).
+- **Two personality styles.** The same factual answers delivered in two
+  different characters (an analyst; a second style under review) — prompt
+  addenda only, never different facts. The "Hej Baba" wake phrase waits
+  on the wake-word models. <!-- lang-ok: the fixed wake phrase -->
+- **Journal (working name).** A passive background collector: periodic
+  one-shot photos plus the conversations themselves, assembled into a day
+  diary with spoken recall. Proposal under owner review.
+- **"Take a picture" command** — pending one hardware probe (a one-shot
+  capture during a glasses-mic conversation has never been proven safe
+  against the camera-mutes-mic regression).
