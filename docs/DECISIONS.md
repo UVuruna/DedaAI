@@ -51,7 +51,13 @@ report each one came from live here — read the entry before arguing with it.
   that session (root constitution Law 4). This project's own build-word
   gate had to learn his actual phrasing twice: "pravi apk" (2026-08-19,
   "apk" wasn't in the recognized word list) and "bill" (2026-08-19, his
-  phone's voice keyboard turned "build" into "bill").
+  phone's voice keyboard turned "build" into "bill"). Third learning
+  (2026-08-21): the word may arrive in the UV/ inbox instead of the chat —
+  the MVP-release order came as `UV/prompt.txt` ("što ćeš mi već sada
+  isporučiti danas", "prva verzija (MVP) sa gita") with the chat message
+  only pointing at the file. The gate now also reads inbox files written
+  for the session (mtime-scoped, so a stale inbox never green-lights a
+  build months later) and knows "isporuči" as his release vocabulary.
 - **2026-08-20** — Resource law: nothing is taken for good, nothing runs as
   an unstoppable background daemon. Decreed after the glasses-mic forensic
   session: the 2026-08-19 build (pre-rename package) wedged in its TALKING

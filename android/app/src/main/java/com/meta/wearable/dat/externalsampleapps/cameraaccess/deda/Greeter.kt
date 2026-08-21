@@ -57,6 +57,7 @@ class Greeter(context: Context) {
         val quitApp: String,
         val updateAvailable: String,
         val updateError: String,
+        val updated: String,
     ) {
         companion object {
             fun forCurrentLanguage(): Texts {
@@ -82,6 +83,7 @@ class Greeter(context: Context) {
                     quitApp = ctx.getString(R.string.deda_quit_app),
                     updateAvailable = ctx.getString(R.string.deda_update_available),
                     updateError = ctx.getString(R.string.deda_update_error),
+                    updated = ctx.getString(R.string.deda_updated),
                 )
             }
         }

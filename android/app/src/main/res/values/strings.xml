@@ -67,6 +67,7 @@
     <string name="deda_quit_app" description="Notification action + home button: quit the whole app">Quit the app</string>
     <string name="deda_update_available" description="Home banner when a newer release exists; %1$s is the version">New version %1$s — update</string>
     <string name="deda_update_error" description="Toast when the update download/install fails">Update failed — try again</string>
+    <string name="deda_updated" description="Notification after a completed self-update">Deda got updated — tap to open</string>
 
     <!-- Getting Started Sheet -->
     <string name="getting_started_title" description="Getting Started sheet title">Getting started</string>

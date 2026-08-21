@@ -4,6 +4,14 @@ Prepared 2026-08-19. Goal: train two custom openWakeWord models for the Serbian
 wake phrases "Hej Deda" and "Ćao Deda" <!-- lang-ok: the wake phrases themselves -->
 on this Windows 11 PC.
 
+> **Storage note (2026-08-21, owner's order):** the heavy, gitignored parts
+> of this folder — `data/`, `venv/`, `output_*/`, `openWakeWord/`,
+> `piper-sample-generator/` (~24 GB) — physically live on `V:\DedaAI\
+> wakeword-training\` now; what sits here are directory junctions to them,
+> so every command below keeps working unchanged. The negative datasets and
+> the venv are phrase-independent and stay reusable for the planned
+> "Hej Baba"/"Ćao Baba" models. <!-- lang-ok: the planned wake phrases -->
+
 **Verdict: feasible, natively on Windows, with real Serbian TTS.** The environment
 is installed and smoke-tested end-to-end short of the actual training run. The
 only hard blocker is the final `.tflite` export (needs Python <= 3.10); training
