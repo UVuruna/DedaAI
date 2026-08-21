@@ -41,6 +41,15 @@ below fixed. Each line: what is unresolved and what would unblock it.
   fail once enforcement reaches a device, so this must land before that
   day. What unblocks: the owner's word to register (needs his Google
   account with 2-step verification and a Payments profile).
+- **Background activity starts: alarm/timer and navigation are unproven
+  with the screen off.** Calls now go through `TelecomManager` and are not
+  affected, but `AlarmClock` and `google.navigation` have no non-activity
+  API, and Android 10+ refuses a background activity start silently. The
+  app has no exemption (no SYSTEM_ALERT_WINDOW, no full-screen intent — a
+  foreground service is NOT one). What unblocks: the hardware test tells us
+  whether they work with the phone locked; if they do not, the choice is
+  the owner's — a one-time "Display over other apps" grant, or dropping
+  those two commands to "we cannot do that with the screen off".
 - **Voice commands (0.1.3) need their sideload probe on the owner's
   phone.** In one guided pass: (1) 0.1.3 installs cleanly with
   CALL_PHONE/READ_CONTACTS/SEND_SMS declared (none are on the hard-block

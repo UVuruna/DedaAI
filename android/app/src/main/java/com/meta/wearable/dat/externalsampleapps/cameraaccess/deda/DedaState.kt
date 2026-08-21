@@ -16,6 +16,21 @@ object DedaState {
     private val _mode = MutableStateFlow(DedaMode.OFF)
     val mode: StateFlow<DedaMode> = _mode
 
-    fun set(mode: DedaMode) { _mode.value = mode }
+    /**
+     * Bumped on every entry into TALKING. Anything that fires on a delay —
+     * a command's hand-over to a phone call, say — must carry the generation
+     * it was scheduled in, or it will act on the NEXT conversation instead
+     * (the same class of race DedaController's wakeGeneration guards).
+     */
+    @Volatile var talkGeneration: Int = 0
+        private set
+
+    fun set(mode: DedaMode) {
+        if (mode == DedaMode.TALKING && _mode.value != DedaMode.TALKING) {
+            talkGeneration++
+        }
+        _mode.value = mode
+    }
+
     fun isOn(): Boolean = _mode.value != DedaMode.OFF
 }

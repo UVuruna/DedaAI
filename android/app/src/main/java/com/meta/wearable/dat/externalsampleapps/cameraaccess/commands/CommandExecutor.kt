@@ -1,11 +1,13 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.commands
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
+import android.telecom.TelecomManager
 import android.telephony.SmsManager
 import android.util.Log
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.DedaMode
@@ -28,8 +30,26 @@ object CommandExecutor {
 
     private val handler = Handler(Looper.getMainLooper())
 
-    /** Pending disambiguation from the last ask_user answer, per tool. */
-    private var lastCandidates: List<ContactResolver.Candidate> = emptyList()
+    /**
+     * The open disambiguation, tied to the QUESTION that produced it. A
+     * choice_number means nothing on its own — it indexes the answer to one
+     * particular question, so it must die with that question. A bare list
+     * survived whole conversations and would dial option 2 of "which Marko"
+     * when the user later said "call Ana, the second one".
+     */
+    private data class Pending(
+        val query: String,
+        val candidates: List<ContactResolver.Candidate>,
+    )
+
+    @Volatile private var pending: Pending? = null
+
+    /** Resource law: no disambiguation outlives the conversation that opened it. */
+    fun clearPending() {
+        pending = null
+    }
+
+    private fun norm(name: String) = name.trim().lowercase()
 
     fun execute(context: Context, name: String, args: JSONObject): JSONObject {
         if (!CommandRegistry.enabled(context)) {
@@ -58,9 +78,14 @@ object CommandExecutor {
 
     private fun makeCall(context: Context, args: JSONObject): JSONObject {
         val candidate = pickCandidate(context, args) ?: return candidatesAnswer(context, args)
-        val intent = Intent(Intent.ACTION_CALL, Uri.parse("tel:${candidate.number}"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
+        // NOT startActivity: Deda works with the phone in a pocket, and
+        // Android 10+ refuses an activity start from an app with no visible
+        // window — silently, so the model would announce a call that never
+        // happened. TelecomManager hands the call to the system, which raises
+        // its own in-call UI with system privileges; a missing CALL_PHONE
+        // raises SecurityException, which the caller turns into no_permission.
+        context.getSystemService(TelecomManager::class.java).placeCall(
+            Uri.fromParts("tel", candidate.number, null), null)
         scheduleHandoff("call placed")
         return status("ok", "calling ${candidate.displayName} (${candidate.label}); " +
             "after your one short sentence the assistant hands over to the call")
@@ -103,8 +128,8 @@ object CommandExecutor {
         }
         if (label.isNotBlank()) intent.putExtra(AlarmClock.EXTRA_MESSAGE, label)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
-        return status("ok", if (timerSeconds > 0) "timer set" else "alarm set")
+        return startAside(context, intent,
+            if (timerSeconds > 0) "timer set" else "alarm set", handoff = false)
     }
 
     // ---- navigation ----------------------------------------------------------
@@ -116,46 +141,92 @@ object CommandExecutor {
             Intent.ACTION_VIEW,
             Uri.parse("google.navigation:q=" + Uri.encode(destination)))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
-        scheduleHandoff("navigation started")
-        return status("ok", "navigation to $destination is starting; after your one " +
-            "short sentence the assistant hands over to the guidance")
+        return startAside(context, intent,
+            "navigation to $destination is starting; after your one short " +
+                "sentence the assistant hands over to the guidance",
+            handoff = true)
+    }
+
+    /**
+     * Starts an activity for a command and tells the truth about it.
+     *
+     * With the phone in a pocket the app has no visible window, and Android
+     * 10+ then refuses the start WITHOUT throwing — so a bare startActivity
+     * let the model announce an alarm or a route that never happened. There
+     * is no API to ask "was I allowed?", so the answer says plainly that the
+     * user must confirm it happened, and no hand-over runs when we could not
+     * even deliver the intent (no app to handle it).
+     */
+    private fun startAside(
+        context: Context,
+        intent: Intent,
+        okDetail: String,
+        handoff: Boolean,
+    ): JSONObject {
+        try {
+            context.startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "no app handles ${intent.action}: $e")
+            return status("error", "no app on this phone can do that")
+        }
+        if (handoff) scheduleHandoff("activity handed over")
+        return status("ok", okDetail)
     }
 
     // ---- shared --------------------------------------------------------------
 
     /**
      * The chosen candidate: either the single match for the spoken name, or
-     * — after an ask_user round-trip — the option the user picked by number.
+     * — after an ask_user round-trip about THAT SAME name — the option the
+     * user picked by number. A choice_number that does not belong to the
+     * open question is ignored, and the name is resolved afresh.
      */
     private fun pickCandidate(
         context: Context,
         args: JSONObject,
     ): ContactResolver.Candidate? {
+        val query = args.optString("contact")
+        val open = pending
         val choice = args.optInt("choice_number", 0)
-        if (choice in 1..lastCandidates.size) return lastCandidates[choice - 1]
-        val matches = ContactResolver.resolve(context, args.optString("contact"))
-        lastCandidates = matches
+        if (choice > 0 && open != null && norm(open.query) == norm(query)) {
+            return open.candidates.getOrNull(choice - 1)
+        }
+        val matches = ContactResolver.resolve(context, query)
+        pending = if (matches.size > 1) Pending(query, matches) else null
         return matches.singleOrNull()
     }
 
-    /** The not-found / pick-one answer for the model to speak from. */
+    /** The not-found / pick-one / bad-choice answer for the model to speak from. */
     private fun candidatesAnswer(context: Context, args: JSONObject): JSONObject {
         val contact = args.optString("contact")
-        if (lastCandidates.isEmpty()) {
+        val open = pending
+        if (args.optInt("choice_number", 0) > 0 && open != null &&
+            norm(open.query) == norm(contact)
+        ) {
+            return status("invalid_choice",
+                "that number is not on the list — read the options again")
+        }
+        if (open == null || norm(open.query) != norm(contact)) {
             return status("not_found", "no contact matching \"$contact\"")
         }
-        val options = lastCandidates.mapIndexed { i, c ->
+        val options = open.candidates.mapIndexed { i, c ->
             "${i + 1}: ${c.displayName}${if (c.label.isBlank()) "" else " (${c.label})"}"
         }.joinToString("; ")
         return status("ask_user",
             "several matches — read the options aloud and call the tool again " +
-                "with choice_number: $options")
+                "with the SAME contact name plus choice_number: $options")
     }
 
     private fun scheduleHandoff(why: String) {
+        val gen = DedaState.talkGeneration
         handler.postDelayed({
-            if (DedaState.mode.value == DedaMode.TALKING) {
+            // Only step aside from the very conversation that asked for it:
+            // a new "Hej Deda" inside these seconds must not be killed by the
+            // previous one's handoff (the race DedaController already guards
+            // with its own generation counter).
+            if (DedaState.mode.value == DedaMode.TALKING &&
+                DedaState.talkGeneration == gen
+            ) {
                 Log.d(TAG, "handoff ($why) — Deda off, audio route released")
                 DedaState.set(DedaMode.OFF)
             }

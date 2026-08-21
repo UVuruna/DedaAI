@@ -98,6 +98,23 @@ report each one came from live here — read the entry before arguing with it.
   would say it), plus the owner's real recordings as the honest
   measurement set. No model replaces the SpeechRecognizer stop-gap until
   it passes that measurement on glasses-mic audio.
+- **2026-08-21** — Commands act through system services, not through
+  activity starts, wherever an API exists. Deda's whole design is "phone in
+  a pocket", so the app usually has no visible window — and Android 10+
+  then refuses an activity start WITHOUT throwing, which let the model
+  announce a call that never happened. Calls therefore go through
+  `TelecomManager.placeCall` (the system raises the in-call UI itself);
+  alarm/timer and navigation have no such API, so they say plainly that the
+  user should confirm it happened, and a missing handler app is reported as
+  an error rather than as success.
+- **2026-08-21** — A wake-word generation pass is judged by the CLIPS ON
+  DISK, never by its exit code. The English-voice pass loads the piper
+  `.pt` voice on CUDA in the same process that openWakeWord imports
+  speechbrain into; on Windows that pair fastfails ucrtbase.dll with
+  0xC0000409 during DLL detach, AFTER every clip is written, with no
+  traceback and no exit path able to dodge it. The exit-code gate silently
+  threw away every English voice — the whole point of the recipe. Do not
+  "fix" the count check back into an rc check.
 - **2026-08-20** — No notification listener in the app, ever. Google Play
   Protect hard-blocks a sideloaded APK that declares one (“sensitive
   data”, no Install-anyway offered) — the owner hit exactly that dialog.

@@ -187,6 +187,9 @@ object GeminiSession {
         stateObservationJob = null
         latestFrame = null
         lastFrameSentAt = 0
+        // An open "which Marko?" belongs to the conversation that asked it
+        // and must not answer a number spoken in the next one.
+        CommandExecutor.clearPending()
         _uiState.value = GeminiUiState()
         if (wasActive) onSessionEnded?.invoke(reason)
     }

@@ -67,6 +67,15 @@ class GeminiLiveService : AiProvider {
 
     private var webSocket: WebSocket? = null
     private val sendExecutor = Executors.newSingleThreadExecutor()
+
+    /**
+     * Tool calls run HERE, never on the reader thread. onMessage is also the
+     * audio pump — playback is a blocking write on it — so a tool that reads
+     * the address book or asks Telecom to place a call would stall the
+     * answer's audio and can starve the socket's pings. Its own thread, kept
+     * apart from sendExecutor, which carries microphone audio.
+     */
+    private val toolExecutor = Executors.newSingleThreadExecutor()
     private var connectCallback: ((Boolean) -> Unit)? = null
     private var timeoutTimer: Timer? = null
 
@@ -295,26 +304,37 @@ class GeminiLiveService : AiProvider {
             if (json.has("toolCall")) {
                 val calls = json.getJSONObject("toolCall").optJSONArray("functionCalls")
                 if (calls != null) {
+                    // The socket this call arrived on: a slow tool must never
+                    // answer into a LATER session's socket.
+                    val socket = webSocket
                     for (i in 0 until calls.length()) {
                         val call = calls.getJSONObject(i)
                         val id = call.optString("id", "")
                         val name = call.optString("name", "")
                         val args = call.optJSONObject("args") ?: JSONObject()
-                        val handled = onFunctionCall?.invoke(name, args)
-                        val response = JSONObject().apply {
-                            put("toolResponse", JSONObject().apply {
-                                put("functionResponses", JSONArray().put(JSONObject().apply {
-                                    put("id", id)
-                                    put("name", name)
-                                    put("response", handled ?: JSONObject().put("output", "ok"))
-                                }))
-                            })
+                        toolExecutor.execute {
+                            val handled = try {
+                                onFunctionCall?.invoke(name, args)
+                            } catch (e: Exception) {
+                                // A crash here must not take the session with
+                                // it; the model still needs an answer.
+                                Log.w(TAG, "tool $name threw: $e")
+                                JSONObject().put("status", "error")
+                                    .put("detail", e.message ?: "failed")
+                            }
+                            val response = JSONObject().apply {
+                                put("toolResponse", JSONObject().apply {
+                                    put("functionResponses", JSONArray().put(JSONObject().apply {
+                                        put("id", id)
+                                        put("name", name)
+                                        put("response", handled ?: JSONObject().put("output", "ok"))
+                                    }))
+                                })
+                            }
+                            socket?.send(response.toString())  // send is thread-safe
+                            Log.d(TAG, "Tool call handled: $name -> ${handled?.optString("status") ?: "ok"}")
+                            if (handled == null) onToolCall?.invoke(name)
                         }
-                        // Direct send like the setup message; webSocket.send
-                        // is thread-safe.
-                        webSocket?.send(response.toString())
-                        Log.d(TAG, "Tool call handled: $name -> ${handled?.optString("status") ?: "ok"}")
-                        if (handled == null) onToolCall?.invoke(name)
                     }
                 }
                 return
