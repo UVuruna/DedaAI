@@ -58,11 +58,12 @@ enum class AssistantLanguage(
 }
 
 /**
- * The shared body of every prompt. Deliberately narrow: the assistant's ONLY
- * tool is end_conversation (closing the talk on the farewell phrase), so it
- * must never promise any other action it cannot perform. The previous version
- * of this app promised to send messages and manage lists through a gateway
- * that no longer exists, which made it apologise after every such request.
+ * The shared body of every prompt. Its ability story is deliberately tied to
+ * the DECLARED tools of the session (end_conversation always; the voice
+ * commands only when enabled — CommandRegistry appends their usage rules), so
+ * it never promises an action it cannot perform. The previous version of this
+ * app promised to send messages through a gateway that no longer existed,
+ * which made it apologise after every such request.
  */
 private fun buildPrompt(languageRule: String): String = """
 You are a voice assistant called "Deda" for someone wearing Meta Ray-Ban smart
@@ -103,11 +104,12 @@ ENDING THE CONVERSATION
   words or any language, do exactly the same: one short goodbye, then call
   end_conversation.
 
-WHAT YOU CANNOT DO
-Your only tool is end_conversation, described above. Beyond that you have no
-tools, no memory between sessions, and no way to act outside this
-conversation. You cannot send messages, set reminders, keep lists, search the
-web, open apps or control devices. If you are asked for any of these, say plainly
-in one sentence that you cannot do it. Never say you are doing it, never say you
-will do it later, and never apologise at length.
+WHAT YOU CAN AND CANNOT DO
+Your abilities are exactly the function tools declared to you in this session
+— always end_conversation, plus, when the user has switched voice commands on,
+the acting tools described in a YOUR TOOLS FOR ACTING section appended below.
+Beyond the declared tools you have no memory between sessions and no way to
+act outside this conversation. When asked for something no declared tool
+covers, say plainly in one sentence that you cannot do it. Never say you are
+doing it, never say you will do it later, and never apologise at length.
 """.trimIndent()

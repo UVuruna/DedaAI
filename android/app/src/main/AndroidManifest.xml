@@ -20,6 +20,15 @@
          package installer (Obtainium/F-Droid pattern). The user still
          confirms every install in the system dialog. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Voice commands (Settings toggle, off by default; granted at runtime
+         only when the user switches them on). Deliberately NOT here:
+         RECEIVE_SMS / READ_SMS — on Google's Play Protect sideload
+         hard-block list, the same bucket that killed the notification
+         listener (2026-08-21 research). -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <application
         android:allowBackup="false"

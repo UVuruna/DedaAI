@@ -47,6 +47,16 @@ object SettingsManager {
         get() = prefs.getLong("updateLastCheckAt", 0L)
         set(value) = prefs.edit().putLong("updateLastCheckAt", value).apply()
 
+    /**
+     * Voice commands (calls, SMS, alarms, navigation). Off by default — the
+     * toggle in Settings asks for the CALL/CONTACTS/SMS permissions when
+     * switched on, and CommandRegistry only declares the tools when BOTH the
+     * toggle and the grants are in place.
+     */
+    var voiceCommandsEnabled: Boolean
+        get() = prefs.getBoolean("voiceCommandsEnabled", false)
+        set(value) = prefs.edit().putBoolean("voiceCommandsEnabled", value).apply()
+
     // dedaMaxSessionMin (the forced session cap) was removed on purpose: a
     // conversation ends ONLY by the stop phrase, the silence timeout above,
     // or Google's own session limit (owner decree 2026-08-19).

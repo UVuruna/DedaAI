@@ -56,6 +56,7 @@ class GeminiLiveService : AiProvider {
     override var onInputTranscription: ((String) -> Unit)? = null
     override var onOutputTranscription: ((String) -> Unit)? = null
     override var onToolCall: ((String) -> Unit)? = null
+    override var onFunctionCall: ((String, JSONObject) -> JSONObject?)? = null
 
     override val inputSampleRate: Int = GeminiConfig.INPUT_AUDIO_SAMPLE_RATE
     override val outputSampleRate: Int = GeminiConfig.OUTPUT_AUDIO_SAMPLE_RATE
@@ -234,20 +235,12 @@ class GeminiLiveService : AiProvider {
                         put("text", GeminiConfig.systemInstruction)
                     }))
                 })
-                // The one declared tool: the model itself ends the talk on the
-                // farewell phrase — the transcript match sometimes never sees
-                // the phrase (missing or translated transcription), this does.
+                // end_conversation always; the voice-command tools when the
+                // user enabled them (declarations live in CommandRegistry —
+                // GeminiConfig hands them over so this transport stays
+                // backend-plumbing only).
                 put("tools", JSONArray().put(JSONObject().apply {
-                    put("functionDeclarations", JSONArray().put(JSONObject().apply {
-                        put("name", "end_conversation")
-                        put(
-                            "description",
-                            "End the current voice conversation immediately. Call this " +
-                                "the moment the user says the farewell phrase (Cao Deda / " +
-                                "Ciao Deda / Chao Deda in any language) or clearly asks " +
-                                "to stop talking.",
-                        )
-                    }))
+                    put("functionDeclarations", GeminiConfig.toolDeclarations())
                 }))
                 put("realtimeInputConfig", JSONObject().apply {
                     put("automaticActivityDetection", JSONObject().apply {
@@ -294,8 +287,11 @@ class GeminiLiveService : AiProvider {
                 return
             }
 
-            // Tool call (the declared end_conversation). Acknowledge FIRST —
-            // the model waits for the function response — then tell the app.
+            // Tool call. A handler that returns a payload (the voice
+            // commands) supplies the model's function response — the model
+            // SPEAKS from it (a numbered contact list, an error). Without
+            // one (end_conversation), acknowledge "ok" FIRST — the model
+            // waits for the response — then tell the app via onToolCall.
             if (json.has("toolCall")) {
                 val calls = json.getJSONObject("toolCall").optJSONArray("functionCalls")
                 if (calls != null) {
@@ -303,20 +299,22 @@ class GeminiLiveService : AiProvider {
                         val call = calls.getJSONObject(i)
                         val id = call.optString("id", "")
                         val name = call.optString("name", "")
+                        val args = call.optJSONObject("args") ?: JSONObject()
+                        val handled = onFunctionCall?.invoke(name, args)
                         val response = JSONObject().apply {
                             put("toolResponse", JSONObject().apply {
                                 put("functionResponses", JSONArray().put(JSONObject().apply {
                                     put("id", id)
                                     put("name", name)
-                                    put("response", JSONObject().put("output", "ok"))
+                                    put("response", handled ?: JSONObject().put("output", "ok"))
                                 }))
                             })
                         }
                         // Direct send like the setup message; webSocket.send
                         // is thread-safe.
                         webSocket?.send(response.toString())
-                        Log.d(TAG, "Tool call handled: $name")
-                        onToolCall?.invoke(name)
+                        Log.d(TAG, "Tool call handled: $name -> ${handled?.optString("status") ?: "ok"}")
+                        if (handled == null) onToolCall?.invoke(name)
                     }
                 }
                 return

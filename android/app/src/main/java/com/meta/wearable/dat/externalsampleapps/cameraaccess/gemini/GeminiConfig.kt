@@ -1,7 +1,9 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.gemini
 
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.assistant.AssistantLanguage
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.commands.CommandRegistry
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
+import org.json.JSONArray
 
 object GeminiConfig {
     const val WEBSOCKET_BASE_URL =
@@ -37,8 +39,18 @@ object GeminiConfig {
     val language: AssistantLanguage
         get() = SettingsManager.assistantLanguage
 
+    /**
+     * The language prompt (or the user's override) plus the live capability
+     * addendum — what the model may DO follows what is actually enabled and
+     * granted right now, never a stale build-time text.
+     */
     val systemInstruction: String
-        get() = SettingsManager.geminiSystemPrompt
+        get() = SettingsManager.geminiSystemPrompt +
+            CommandRegistry.promptAddendum(SettingsManager.appContext)
+
+    /** Function declarations for the setup message, per current settings. */
+    fun toolDeclarations(): JSONArray =
+        CommandRegistry.toolDeclarations(SettingsManager.appContext)
 
     val speechLanguageCode: String?
         get() = language.speechLanguageCode

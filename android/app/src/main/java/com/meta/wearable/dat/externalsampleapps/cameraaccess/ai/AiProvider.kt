@@ -49,10 +49,18 @@ interface AiProvider {
     /**
      * The backend invoked one of the function tools declared at setup; the
      * argument is the tool name. The transport acknowledges the call itself —
-     * this only tells the app to act. Today the single declared tool is
-     * end_conversation.
+     * this only tells the app to act. Fire-and-forget tools (end_conversation)
+     * ride here.
      */
     var onToolCall: ((String) -> Unit)?
+
+    /**
+     * A tool call that needs a real answer: name + arguments in, the
+     * function-response payload out (spoken from by the model — e.g. a
+     * numbered contact list to disambiguate). Return null to fall back to
+     * the plain "ok" acknowledgement + [onToolCall].
+     */
+    var onFunctionCall: ((String, org.json.JSONObject) -> org.json.JSONObject?)?
 
     /** PCM16 sample rate this provider expects on [sendAudio]. */
     val inputSampleRate: Int

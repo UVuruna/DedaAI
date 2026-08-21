@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.util.Log
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ai.AiConnectionState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ai.AiProvider
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.commands.CommandExecutor
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.SettingsManager
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.VideoFrameMode
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.StreamingMode
@@ -115,6 +116,15 @@ object GeminiSession {
 
         provider.onToolCall = { name ->
             if (name == "end_conversation") onEndConversation?.invoke()
+        }
+
+        // The voice commands: executed here, and the returned status payload
+        // becomes the model's function response — it SPEAKS from it (numbered
+        // contact options, sent/error). end_conversation stays on the plain
+        // acknowledge path above.
+        provider.onFunctionCall = { name, args ->
+            if (name == "end_conversation") null
+            else CommandExecutor.execute(SettingsManager.appContext, name, args)
         }
 
         provider.onDisconnected = { reason ->

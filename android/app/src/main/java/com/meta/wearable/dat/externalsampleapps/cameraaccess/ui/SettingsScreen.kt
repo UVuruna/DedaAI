@@ -1,6 +1,7 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.assistant.AssistantLanguage
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.commands.CommandRegistry
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.deda.GlassesButtonService
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.settings.DedaActivationMode
 import androidx.compose.runtime.collectAsState
@@ -56,19 +58,25 @@ fun SettingsScreen(
     // as if it were theirs (public APK, pregled 8). Empty = default active.
     var geminiAPIKey by remember { mutableStateOf(SettingsManager.geminiAPIKeyUser) }
     var language by remember { mutableStateOf(SettingsManager.assistantLanguage) }
-    var systemPrompt by remember { mutableStateOf(SettingsManager.geminiSystemPrompt) }
     var videoFrameMode by remember { mutableStateOf(SettingsManager.videoFrameMode) }
     var glassesMic by remember { mutableStateOf(SettingsManager.glassesMicEnabled) }
     var dedaActivation by remember { mutableStateOf(SettingsManager.dedaActivationMode) }
     var dedaSilenceSec by remember { mutableStateOf(SettingsManager.dedaSilenceTimeoutSec.toString()) }
+    var voiceCommands by remember { mutableStateOf(SettingsManager.voiceCommandsEnabled) }
     var showResetDialog by remember { mutableStateOf(false) }
+
+    // Switching the commands ON asks for their permissions right here; the
+    // tools reach Gemini only when both the toggle and the grants hold.
+    val commandPermissionLauncher = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* CommandRegistry re-checks grants on every session start */ }
 
     fun save() {
         SettingsManager.geminiAPIKey = geminiAPIKey.trim()
-        SettingsManager.geminiSystemPrompt = systemPrompt.trim()
         SettingsManager.videoFrameMode = videoFrameMode
         SettingsManager.glassesMicEnabled = glassesMic
         SettingsManager.dedaActivationMode = dedaActivation
+        SettingsManager.voiceCommandsEnabled = voiceCommands
         dedaSilenceSec.toIntOrNull()?.let { SettingsManager.dedaSilenceTimeoutSec = it }
         // The always-on service re-reads the activation mode on every start.
         GlassesButtonService.start(context)
@@ -77,20 +85,19 @@ fun SettingsScreen(
     fun reload() {
         geminiAPIKey = SettingsManager.geminiAPIKeyUser
         language = SettingsManager.assistantLanguage
-        systemPrompt = SettingsManager.geminiSystemPrompt
         videoFrameMode = SettingsManager.videoFrameMode
         glassesMic = SettingsManager.glassesMicEnabled
         dedaActivation = SettingsManager.dedaActivationMode
         dedaSilenceSec = SettingsManager.dedaSilenceTimeoutSec.toString()
+        voiceCommands = SettingsManager.voiceCommandsEnabled
     }
 
-    // Switching language rewrites the prompt in the box, unless the user has
-    // written their own. A hand-edited prompt is never discarded silently.
+    // The manager migrates the (internal) per-language prompt on switch; the
+    // prompt itself is no user-facing setting anymore (owner 2026-08-21: an
+    // ordinary user must neither see nor edit it).
     fun selectLanguage(next: AssistantLanguage) {
-        SettingsManager.geminiSystemPrompt = systemPrompt.trim()
         SettingsManager.assistantLanguage = next
         language = next
-        systemPrompt = SettingsManager.geminiSystemPrompt
     }
 
     // Declared before the guide early-return so the list does not jump back
@@ -237,22 +244,49 @@ fun SettingsScreen(
             )
             Hint("A conversation ends when you say the farewell phrase or after the silence above; Google's own session limit may also end it.")
 
-            SectionHeader("System Prompt")
-            OutlinedTextField(
-                value = systemPrompt,
-                onValueChange = { systemPrompt = it },
-                label = { Text("System prompt") },
-                modifier = Modifier.fillMaxWidth().height(200.dp),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-            )
-            if (systemPrompt.trim() != language.systemPrompt.trim()) {
-                TextButton(onClick = {
-                    SettingsManager.clearSystemPromptOverride()
-                    systemPrompt = SettingsManager.geminiSystemPrompt
-                }) {
-                    Text("Restore default for " + language.displayName)
-                }
+            SectionHeader("Voice commands")
+            // lang-ok-begin: user-facing command toggle texts, per assistant language
+            val commandsLabel = when (language) {
+                AssistantLanguage.SERBIAN -> "Pozivi, poruke, alarmi, navigacija"
+                AssistantLanguage.SLOVENIAN -> "Klici, sporočila, alarmi, navigacija"
+                AssistantLanguage.ENGLISH -> "Calls, messages, alarms, navigation"
             }
+            val commandsHintOn = when (language) {
+                AssistantLanguage.SERBIAN -> "U razgovoru: \"pozovi Marka\", \"pošalji poruku...\", \"navij alarm\", \"vodi me do...\". Poruka se šalje tek kad je Deda pročita i ti potvrdiš."
+                AssistantLanguage.SLOVENIAN -> "V pogovoru: \"pokliči Marka\", \"pošlji sporočilo...\", \"nastavi alarm\", \"vodi me do...\". Sporočilo se pošlje šele, ko ga Deda prebere in potrdiš."
+                AssistantLanguage.ENGLISH -> "In a conversation: \"call Marko\", \"send a message...\", \"set an alarm\", \"navigate to...\". A message is sent only after Deda reads it back and you confirm."
+            }
+            val commandsHintOff = when (language) {
+                AssistantLanguage.SERBIAN -> "Isključeno — Deda samo razgovara."
+                AssistantLanguage.SLOVENIAN -> "Izklopljeno — Deda se samo pogovarja."
+                AssistantLanguage.ENGLISH -> "Off — Deda only talks."
+            }
+            val commandsNoGrant = when (language) {
+                AssistantLanguage.SERBIAN -> "Dozvole nisu date — komande ostaju isključene dok ih ne odobriš."
+                AssistantLanguage.SLOVENIAN -> "Dovoljenja niso dana — ukazi ostanejo izklopljeni, dokler jih ne odobriš."
+                AssistantLanguage.ENGLISH -> "Permissions not granted — commands stay off until you allow them."
+            }
+            // lang-ok-end
+            ChipRow(
+                options = listOf(true, false),
+                selected = voiceCommands,
+                labelOf = { if (it) "On" else "Off" },
+                onSelect = { on ->
+                    voiceCommands = on
+                    SettingsManager.voiceCommandsEnabled = on
+                    if (on && !CommandRegistry.permissionsGranted(context)) {
+                        commandPermissionLauncher.launch(CommandRegistry.COMMAND_PERMISSIONS)
+                    }
+                },
+            )
+            Hint(commandsLabel)
+            Hint(
+                when {
+                    !voiceCommands -> commandsHintOff
+                    CommandRegistry.permissionsGranted(context) -> commandsHintOn
+                    else -> commandsNoGrant
+                }
+            )
 
             SectionHeader("App")
             // lang-ok-begin: user-facing update-check texts, per assistant language
