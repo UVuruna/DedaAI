@@ -31,6 +31,7 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <application
+        android:name=".DedaApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="DedaAI"

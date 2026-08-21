@@ -16,9 +16,16 @@ object SettingsManager {
     lateinit var appContext: Context
         private set
 
+    /**
+     * Called from [DedaApp.onCreate], which Android runs before any activity,
+     * service or receiver of this process — so every entry point finds the
+     * prefs ready. Idempotent on purpose: MainActivity still calls it too,
+     * and a second call must be harmless rather than a second prefs object.
+     */
     fun init(context: Context) {
+        if (::prefs.isInitialized) return
         appContext = context.applicationContext
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     /**
