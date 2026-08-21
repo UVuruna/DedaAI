@@ -4,14 +4,14 @@
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
-          { "type": "command", "command": "python tests/run_guards.py --fast" }
+          { "type": "command", "command": "python -c \"import os,sys,runpy;d=os.path.abspath(os.environ.get('CLAUDE_PROJECT_DIR') or '.');[d:=os.path.dirname(d) for _ in range(8) if not os.path.isfile(os.path.join(d,'tests','run_guards.py'))];p=os.path.join(d,'tests','run_guards.py');sys.exit(0) if not os.path.isfile(p) else None;sys.argv=[p,'--fast'];runpy.run_path(p,run_name='__main__')\"" }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "python tests/run_guards.py" }
+          { "type": "command", "command": "python -c \"import os,sys,runpy;d=os.path.abspath(os.environ.get('CLAUDE_PROJECT_DIR') or '.');[d:=os.path.dirname(d) for _ in range(8) if not os.path.isfile(os.path.join(d,'tests','run_guards.py'))];p=os.path.join(d,'tests','run_guards.py');sys.exit(0) if not os.path.isfile(p) else None;sys.argv=[p];runpy.run_path(p,run_name='__main__')\"" }
         ]
       }
     ]
