@@ -23,7 +23,7 @@ for, no screen to look at — just the two phrases, worn on your face.
 
 ## Table of Contents
 
-- [What it does](#what)
+- [What it does](#what) — the full list: [FUNCTIONALITIES.md](FUNCTIONALITIES.md)
 - [Requirements](#requirements)
 - [Install](#install)
 - [Your own Gemini key](#key)

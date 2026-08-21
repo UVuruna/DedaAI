@@ -18,6 +18,8 @@ top-level folder is for, and where its own truth lives.
 ## Where the truth lives
 
 - **What the app must do (the MVP behaviour contract):** [CLAUDE.md](CLAUDE.md).
+- **What the app does, grouped and briefly (the functionality register):**
+  [FUNCTIONALITIES.md](FUNCTIONALITIES.md).
 - **Why it does it that way, dated:** [docs/DECISIONS.md](docs/DECISIONS.md).
 - **The design and research history (long-form, not an index):** [docs/PLAN.md](docs/PLAN.md).
 - **Known gaps, read before a hardware test:** [OPEN-ISSUES.md](OPEN-ISSUES.md).

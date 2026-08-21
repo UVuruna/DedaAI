@@ -3,9 +3,8 @@
 Known gaps, read before a hardware test session and before marking any item
 below fixed. Each line: what is unresolved and what would unblock it.
 
-<!-- old-name-ok: OPEN-ISSUES.md must name the leftover folder and its old
-     path so the owner can find and delete it — see tests/test_old_name.py
-     ALLOWED. -->
+<!-- old-name-ok: OPEN-ISSUES.md names the old project path in the resolved
+     leftover-checkout note below — see tests/test_old_name.py ALLOWED. -->
 - **Wake-word models trained but NOT integrated.** Both openWakeWord models
   exist (`wakeword-training/models/`, exported to ONNX): `hej_deda` —
   accuracy 0.78, recall 0.56; `cao_deda` — accuracy 0.86, recall 0.73. Both
@@ -21,11 +20,23 @@ below fixed. Each line: what is unresolved and what would unblock it.
   documented figures (roughly 2 min for audio+video, ~15 min audio-only)
   come from Firebase/Vertex docs, not confirmed against the Google AI Studio
   Developer API free tier this app actually uses.
-- **Leftover pre-move checkout at the OLD project path.** A `VisionClaw`
-  folder — the upstream sample this app started from — is still on disk at
-  the project's old location, `U:\Coding\Meta RayBan AI\` (where the project
-  lived before its move into this repo as `android/`). It was locked and
-  could not be deleted at the time of writing; delete it once it is free.
+- **RESOLVED 2026-08-21 — Leftover pre-move checkout is gone.** The old
+  location `U:\Coding\Meta RayBan AI` with its checkout of the upstream
+  sample this app started from disappeared from disk during the 2026-08-21
+  session — not deleted by the session's own tooling (its move script
+  found the path already missing); presumed deleted by the owner by hand.
+  NOTE: the pre-move git history (the 15 commits from before the monorepo
+  move) lived only in that checkout and was not bundled first — it is
+  gone with the folder.
+- **Android Developer Verification threatens the whole sideload model
+  (flagged 2026-08-21, needs its own research pass).** Google begins
+  requiring registered/verified developer identity for ALL installed apps
+  — sideloaded included — on certified devices: Brazil/Indonesia/
+  Singapore/Thailand from September 2026, globally through 2027+. DedaAI
+  distributes exclusively by GitHub-release sideload; unaddressed, updates
+  (and first installs) may start being refused on users' phones. What
+  unblocks: a dedicated research session on the verification program's
+  actual requirements for a hobby developer, before the global rollout.
 - **Wake listening: which microphone — glasses, phone, or both? (owner will
   decide; sketch only, decreed 2026-08-20 during the dead-glasses-mic
   session).** The glasses' mic died physically and the product was deaf with
