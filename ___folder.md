@@ -13,7 +13,7 @@ top-level folder is for, and where its own truth lives.
 | `release/` | build-to-GitHub-release pipeline (`publish.py` / `publish.cmd`) and the two illustrated-guide builders | — |
 | `wakeword-training/` | offline training pipeline for the two openWakeWord wake/stop-phrase models | [SETUP-REPORT.md](wakeword-training/SETUP-REPORT.md) |
 | `tests/` | this project's 3 guards (old-name, docs nav-chain, `.kt` size report) | [run_guards.py](tests/run_guards.py) |
-| `UV/` | the owner's inbox — free-form specs/images, read at session start, never edited | — |
+| `UV/` | the owner's inbox — free-form specs/images, read at session start; HIS files are never edited, and sessions leave their Serbian drafts/instructions addressed to him here (untracked) | — |
 
 ## Where the truth lives
 
