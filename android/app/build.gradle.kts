@@ -63,8 +63,21 @@ android {
 
   buildTypes {
     release {
-      isMinifyEnabled = true
-      isShrinkResources = true
+      // MINIFICATION IS OFF, and that is the fix for the 0.1.5 crash
+      // (2026-08-22). R8's shrinker deleted 61 native methods the SDK's
+      // .so files register by name — Framing.packNative among them — and
+      // the process aborted on every launch that reached the SDK. The
+      // debug build, which is never minified, never showed the bug: an
+      // unminified release is therefore a PROVEN-GOOD configuration,
+      // while any keep-rule set is only as good as the holes we happened
+      // to find. For a sideloaded APK with no size ceiling that trade is
+      // not close.
+      // proguard-rules.pro keeps the corrected rules (-keepclasseswith
+      // memberS, global) for the day we re-enable this — and re-enabling
+      // it MUST be gated on release/smoke_relaunch.py, the multi-launch
+      // smoke that would have caught this in the first place.
+      isMinifyEnabled = false
+      isShrinkResources = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig =
           if (System.getenv("DEDA_KEYSTORE") != null) signingConfigs.getByName("release")
