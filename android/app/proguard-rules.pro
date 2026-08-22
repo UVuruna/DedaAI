@@ -69,6 +69,13 @@
 -keep class com.facebook.** { *; }
 -dontwarn com.facebook.**
 
+# libfb.so registers com/facebook/xplat/fbglog/FbGlog by name (it exports zero
+# Java_* symbols), and R8 deleted all three FbGlog classes in 0.1.5
+# (usage.txt:43794-43796). Non-fatal -- glog init has a "Failed to initialize
+# glog" soft branch, which is why the 0.1.5 abort named Framing.packNative and
+# not this -- but without it the SDK's native logging goes nowhere.
+-keep class com.facebook.xplat.fbglog.** { *; }
+
 # fbjni / Meta infra mark their JNI surface with these annotations.
 -keep @com.facebook.jni.annotations.DoNotStrip class * { *; }
 -keep @com.facebook.proguard.annotations.DoNotStrip class * { *; }
