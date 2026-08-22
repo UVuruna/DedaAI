@@ -98,12 +98,32 @@ object TalkVision {
 
     /**
      * One-shot: open the glasses camera just long enough for a single REAL
-     * still (StreamSession.capturePhoto — full resolution, not a video
-     * frame), then close it. This is the owner's actual conversation spec
-     * ("one picture at the START of the conversation") — the picture is
-     * taken BEFORE the Gemini audio session starts, so the camera channel
-     * and the conversation audio never run at the same time (running them
-     * together muted the session on real hardware, 2026-08-19).
+     * still, then close it.
+     *
+     * "Real still" means capturePhoto delivers its own HEIC frame with EXIF
+     * over a separate wire message, NOT a grab from the video stream — but
+     * it is NOT the glasses' 12 MP gallery photo either. PhotoFormat in DAT
+     * 0.4.0 carries no width or height at all: the glasses choose, and
+     * public reports put it near 1440x1080. There is no API for the
+     * first-party capture; the wire protocol has REQUEST_PHOTO_CAPTURE, but
+     * DAT hard-codes third-party apps as APPLICATION_TYPE_UNKNOWN and never
+     * sends it. (Verified against mwdat-camera-0.4.0.aar, 2026-08-22.)
+     *
+     * The stream is not optional: StreamSessionImpl.capturePhoto throws
+     * IllegalStateException("Can only capture photos while streaming video")
+     * unless the session is already STREAMING. Every photo therefore costs a
+     * full stream bring-up, and 0.4.0 has no pause/resume — open, shoot,
+     * close is the only shape the SDK offers.
+     *
+     * Taking it BEFORE the Gemini audio session is the owner's conversation
+     * spec ("one picture at the START"). Note that the SDK does NOT contend
+     * for the microphone: it sets the stream's audio channel disabled and
+     * never touches the mic, and Meta documents HFP alongside DAT streaming
+     * as supported. The one session that looked like the camera muting the
+     * mic (2026-08-19) was never logged, and the glasses' mic was found
+     * physically blocked the next day. Keep the ordering for now anyway —
+     * 0.4.0 cannot express Meta's prescribed HFP-first sequence, since
+     * startStreamSession() fuses add and start (the split arrives in 0.5.0).
      *
      * Calls [onDone] exactly once, on the main thread, with the picture or
      * null (no glasses, timeout, any failure, or the continuous stream

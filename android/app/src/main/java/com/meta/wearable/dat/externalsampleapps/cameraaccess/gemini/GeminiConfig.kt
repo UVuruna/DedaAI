@@ -28,11 +28,17 @@ object GeminiConfig {
     const val VIDEO_JPEG_QUALITY = 80 // one frame per question, so we can afford it (was 50 at 1 fps)
 
     /**
-     * Longest edge (px) for a preloaded photo (GeminiSession.preloadFrame).
-     * A real capturePhoto still is ~4x the pixels of the old video-frame
-     * path; capping the longest edge keeps one JPEG from gambling the
-     * WebSocket send. Smaller pictures pass through unscaled, and the JPEG
-     * quality stays [VIDEO_JPEG_QUALITY].
+     * Longest edge (px) for a preloaded photo (GeminiSession.preloadFrame),
+     * a ceiling rather than a working limit: capping keeps one JPEG from
+     * gambling the WebSocket send. Smaller pictures pass through unscaled,
+     * and the JPEG quality stays [VIDEO_JPEG_QUALITY].
+     *
+     * On DAT 0.4.0 this never actually fires. capturePhoto returns roughly
+     * 1440x1080 against the HIGH video path's 720x1280 — about 1.7x the
+     * pixels, not the "~4x" an earlier comment here claimed, and nowhere
+     * near this edge. Kept because PhotoFormat declares no dimensions, so
+     * the glasses may hand us something larger on other firmware or a later
+     * SDK. (Measured against mwdat-camera-0.4.0.aar, 2026-08-22.)
      */
     const val PHOTO_MAX_SEND_EDGE = 2560
 
