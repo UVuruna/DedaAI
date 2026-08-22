@@ -352,40 +352,42 @@ def train(cfg):
 
 
 def clean_stream_scores(onnx, clip_root, limit=200):
-    """Score CLEAN clips the way the phone will: full openWakeWord pipeline,
-    1280-sample chunks, peak score per clip.
+    """Score CLEAN clips the way the phone will: openWakeWord's own
+    predict_clip (chunked streaming + the 1 s silence padding short clips need),
+    peak score per clip.
 
     The feature arrays the trainer validates on are noise- and reverb-augmented
     single windows -- a stress test, not the operating point, and reading them
     as "the model is deaf" was wrong (2026-08-22: the same model reads 0.645
-    there and 0.960 on clean speech). Both numbers get logged from now on, so
-    nobody has to guess which one a figure came from.
+    there and 0.935 on clean speech). Both numbers get logged from now on.
+
+    The negatives here are the WHOLE negative_test set: openWakeWord's
+    auto-generated adversarial texts (the bulk) plus the hand-written Serbian
+    near-misses from custom_negative_phrases, which cannot be told apart by
+    filename. Do not report this rate as "hej deko fires N%" -- it is the
+    adversarial set as a whole (pregled 18).
     """
     import numpy as np
-    import soundfile as sf
     from openwakeword.model import Model
     model = Model(wakeword_models=[onnx], inference_framework='onnx')
     key = list(model.models.keys())[0]
 
     def peaks(sub, want_en=None):
-        paths = sorted(os.path.join(clip_root, sub, n)
-                       for n in os.listdir(os.path.join(clip_root, sub))
+        d = os.path.join(clip_root, sub)
+        paths = sorted(os.path.join(d, n) for n in os.listdir(d)
                        if n.endswith('.wav')
                        and (want_en is None or n.startswith('en_') == want_en))
         out = []
         for path in paths[:limit]:
-            data, _ = sf.read(path, dtype='int16')
             model.reset()
-            best = 0.0
-            for i in range(0, max(len(data) - 1280, 1), 1280):
-                best = max(best, float(model.predict(data[i:i + 1280])[key]))
-            out.append(best)
-        return np.array(out) if out else None
+            frames = model.predict_clip(path)
+            out.append(max((float(f[key]) for f in frames), default=0.0))
+        return (np.array(out), len(paths)) if out else (None, len(paths))
 
     return peaks('positive_test', want_en=False), peaks('negative_test')
 
 
-def evaluate(cfg, thresholds=(0.5, 0.7, 0.9)):
+def evaluate(cfg, thresholds=(0.5, 0.7, 0.9), onnx_override=None):
     """Measure the finished .onnx and WRITE THE NUMBER DOWN.
 
     openWakeWord's trainer computes accuracy/recall itself but announces them
@@ -400,6 +402,9 @@ def evaluate(cfg, thresholds=(0.5, 0.7, 0.9)):
     import numpy as np
     import onnxruntime as ort
     _, name, _, clip_root, onnx = model_paths(cfg)
+    if onnx_override:
+        onnx = os.path.abspath(onnx_override)
+        name = '%s [%s]' % (name, os.path.basename(os.path.dirname(onnx)))
     pos_f = os.path.join(clip_root, 'positive_features_test.npy')
     neg_f = os.path.join(clip_root, 'negative_features_test.npy')
     for f in (onnx, pos_f, neg_f):
@@ -448,29 +453,38 @@ def evaluate(cfg, thresholds=(0.5, 0.7, 0.9)):
     log('evaluate %s: %.1f%% of augmented clips score under 0.01 '
         '(that set is noise + reverb, not clean speech)'
         % (name, 100.0 * float((pos < 0.01).mean())))
-    # The operating point: clean speech through the streaming pipeline, plus
-    # how often the hand-written near-miss phrases ("hej deko", "ej deda")
-    # trigger it. This is the pair that decides a usable threshold.
+    # The operating point: clean speech through the library's own streaming
+    # scorer, beside how often the adversarial negatives trigger it.
+    clean_pos = clean_neg = None
     try:
-        clean_pos, clean_neg = clean_stream_scores(onnx, clip_root)
-    except Exception as e:
-        log('evaluate %s: clean-audio pass skipped (%s)' % (name, e))
-        clean_pos = clean_neg = None
+        (clean_pos, n_pos_all), (clean_neg, n_neg_all) = clean_stream_scores(onnx, clip_root)
+    except (ImportError, OSError, KeyError, ValueError) as e:
+        # Loud on purpose: a run without this number is a run that did not
+        # answer the only question it was started for.
+        log('evaluate %s: !! CLEAN-AUDIO PASS FAILED (%s: %s) -- this run has '
+            'NO operating-point number' % (name, type(e).__name__, e))
     if clean_pos is not None:
+        log('evaluate %s: clean pass on %d of %d positive and %d of %d '
+            'adversarial-negative clips (first N, alphabetical)'
+            % (name, len(clean_pos), n_pos_all,
+               0 if clean_neg is None else len(clean_neg), n_neg_all))
         for th in thresholds:
             fired = ('%.3f' % (clean_neg >= th).mean()) if clean_neg is not None else 'n/a'
-            log('evaluate %s: CLEAN streaming, threshold %.2f -> recall %.3f '
-                '(n=%d), near-miss phrases fire %s'
-                % (name, th, float((clean_pos >= th).mean()), len(clean_pos), fired))
+            log('evaluate %s: CLEAN streaming, threshold %.2f -> recall %.3f, '
+                'adversarial negatives fire %s' % (name, th, float((clean_pos >= th).mean()), fired))
     return rows
 
 
 def main():
     if '--evaluate' in sys.argv:
-        cfgs = sys.argv[sys.argv.index('--evaluate') + 1:]
-        cfgs = cfgs or ['hej_deda.yaml', 'cao_deda.yaml']
-        for cfg in cfgs:
-            evaluate(cfg)
+        rest = sys.argv[sys.argv.index('--evaluate') + 1:]
+        override = None
+        if '--model' in rest:                 # score an older .onnx on this
+            i = rest.index('--model')         # model's own held-out clips
+            override = rest[i + 1]
+            rest = rest[:i] + rest[i + 2:]
+        for cfg in rest or ['hej_deda.yaml', 'cao_deda.yaml']:
+            evaluate(cfg, onnx_override=override)
         return 0
     if '--smoke' in sys.argv:
         log('=== smoke-only run ===')

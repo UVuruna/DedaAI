@@ -5,31 +5,43 @@ below fixed. Each line: what is unresolved and what would unblock it.
 
 <!-- old-name-ok: OPEN-ISSUES.md names the old project path in the resolved
      leftover-checkout note below — see tests/test_old_name.py ALLOWED. -->
-- **Wake-word models retrained and measured 2026-08-22 — usable on clean
-  speech, not yet proven on real glasses audio.** Two numbers per model, and
-  they must never be quoted for each other. CLEAN speech through the
-  streaming pipeline (how the phone actually listens, peak score per clip,
-  n=200): `hej_deda` recall **0.935** at threshold 0.5 (0.925 at 0.7, 0.910
-  at 0.9) with the hand-written near-miss phrases ("hej deko", "ej deda")
-  firing 2.5 % / 2.0 % / 1.5 %; `cao_deda` recall **0.975** at 0.5 (0.955 at
-  0.7) with near-misses firing 0.5 % / 0.0 %. The trainer's own validation
-  set is noise- and reverb-augmented single windows — a stress test — and
-  reads much lower: hej 0.645, cao 0.760. The earlier "the model misses half
-  the wake phrases" reading came from that stress metric alone and was wrong
-  about clean speech; the old model reached 0.810 clean, the retrained one
-  0.935. Recommended starting threshold: **0.7 for hej_deda, 0.5 for
-  cao_deda** — re-decide once real recordings exist. Integration
-  (onnxruntime-android) still waits on a measurement over real SCO/glasses
-  audio; until then the app runs Android's own `SpeechRecognizer` in a
-  restart loop.
-- **The recall/false-accept trade was the root cause, and it is fixed in the
+- **Wake-word models retrained 2026-08-22; on synthetic speech they are
+  saturated, so only the stress metric separates them and only real
+  recordings can judge them.** Every figure below comes from
+  `run_training.py --evaluate` and sits in `wakeword-training/training.log`
+  (18:08-18:10). CLEAN speech through openWakeWord's own `predict_clip`
+  (200 held-out clips, peak score per clip): `hej_deda` **1.000** at
+  threshold 0.5 (0.995 at 0.9), the old pre-retune model **0.985**,
+  `cao_deda` **1.000** at every threshold. That measure is useless for
+  ranking models — the test clips come from the same TTS voices the models
+  trained on, so both old and new score ~1.0. The trainer's own validation
+  set (noise + reverb, single window) is where they differ: `hej_deda`
+  0.645 vs the old model's 0.521, `cao_deda` 0.760; the share of those
+  clips a model scores near zero fell from 37.0 % to 23.2 % for hej.
+  Adversarial negatives fire 2.0 % (hej) and 0.0 % (cao) at threshold 0.5 —
+  that set is openWakeWord's auto-generated adversarial texts plus the
+  hand-written Serbian near-misses, which cannot be told apart by filename,
+  so it is NOT a "hej deko fires N %" number. Starting threshold if a model
+  is ever wired in: 0.7 for hej_deda, 0.5 for cao_deda. Integration
+  (onnxruntime-android) still waits on real SCO/glasses audio; the app runs
+  Android's own `SpeechRecognizer` in a restart loop until then.
+- **Two measurement traps already paid for, do not step in them again.**
+  (1) A hand-rolled 1280-sample streaming loop reads far lower than
+  `predict_clip`, which pads 1 s of silence so short clips fill the model's
+  window — the same baseline model measured 0.810 by hand and 0.985 through
+  the library. Use the library's scorer. (2) Copying an exported `.onnx`
+  under a new name silently loads the WRONG weights: the file references its
+  external data by the original filename, so a renamed copy picks up
+  whatever `<original>.onnx.data` is on disk. Baselines therefore live in
+  their own directory (`output_hej_deda/baseline_fp02/`) under the original
+  filename, scored with `--evaluate <cfg> --model <path>`.
+- **The recall/false-accept trade was the root cause and is fixed in the
   configs.** `target_false_positives_per_hour: 0.2` with
-  `max_negative_weight: 1500` bought silence with deafness: the old hej model
-  scored 0.521 on the stress set and 0.810 clean. At 1.0 FP/hr, negative
-  weight 300 and layer_size 96 — same clips, only the trade changed — the
-  same model reads 0.645 stress / 0.935 clean, and the share of augmented
-  clips it scores near zero fell from 45 % to 23 %. The measurement sits in
-  a comment beside the parameters; do not tighten them blind.
+  `max_negative_weight: 1500` bought silence with deafness under noise. At
+  1.0 FP/hr, negative weight 300 and layer_size 96 — same clips, only the
+  trade changed — hej_deda's stress recall went 0.521 -> 0.645. The
+  measurement sits in a comment beside the parameters; do not tighten them
+  blind.
 - **Slovenian TTS quality unverified.** Serbian pronunciation was confirmed
   acceptable on-device (2026-08-18, phone test); Slovenian has not had the
   same on-device listening pass yet.
