@@ -69,12 +69,36 @@
 -keep class com.facebook.** { *; }
 -dontwarn com.facebook.**
 
-# libfb.so registers com/facebook/xplat/fbglog/FbGlog by name (it exports zero
-# Java_* symbols), and R8 deleted all three FbGlog classes in 0.1.5
-# (usage.txt:43794-43796). Non-fatal -- glog init has a "Failed to initialize
-# glog" soft branch, which is why the 0.1.5 abort named Framing.packNative and
-# not this -- but without it the SDK's native logging goes nowhere.
--keep class com.facebook.xplat.fbglog.** { *; }
+# libfb.so's JNI_OnLoad registers com/facebook/xplat/fbglog/FbGlog by name (it
+# exports zero Java_* symbols), in the same registration run as
+# com.facebook.jni.CpuCapabilitiesJni. R8 deleted all three FbGlog classes in
+# 0.1.5 (usage.txt:43794-43796). Probably non-fatal -- glog has a "Failed to
+# initialize glog" soft branch, which is why the 0.1.5 abort named
+# Framing.packNative and not this -- but a FindClass miss leaves a pending
+# exception, and without it the SDK's native logging goes nowhere anyway.
+-keep class com.facebook.xplat.** { *; }
+
+# protobuf-lite resolves message fields BY NAME at runtime (RawMessageInfo ->
+# MessageSchema.reflectField -> getDeclaredField("mime_")). Nothing keeps the
+# DAT SDK's generated messages: protobuf-javalite ships no consumer rules and
+# none of the three mwdat AARs carries a proguard.txt. The 0.1.5 build proves
+# it, A/B inside one mapping.txt:
+#     com.meta.media.stream.proto.AudioConfig.mime_  ->  J    (renamed)
+#     com.google.crypto.tink...KeyData.keyValue_     ->  keyValue_   (kept)
+# tink keeps its names only because tink ships its own rule (configuration.txt
+# :880); datastore likewise (:697). The plain com.google.protobuf the SDK uses
+# has no such rule, and the shipped dex still holds the literal "mime_" while
+# the field is now J -- a first-parse
+#     RuntimeException: Field mime_ for G3.e not found. Known fields are [...]
+# This never fired in production because Wearables.initialize() has never once
+# survived a minified build, so the session handshake that parses these
+# messages is unexercised release code. It would fire the moment the JNI fix
+# above let the SDK start. 25 message classes are affected across
+# com.meta.media.stream.proto, com.meta.coreux.session.proto, com.oculus.atc,
+# com.oculus.snappmanager and com.meta.constellationauth.
+-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite {
+    <fields>;
+}
 
 # fbjni / Meta infra mark their JNI surface with these annotations.
 -keep @com.facebook.jni.annotations.DoNotStrip class * { *; }
