@@ -5,22 +5,31 @@ below fixed. Each line: what is unresolved and what would unblock it.
 
 <!-- old-name-ok: OPEN-ISSUES.md names the old project path in the resolved
      leftover-checkout note below — see tests/test_old_name.py ALLOWED. -->
-- **Wake-word models trained but NOT integrated, and the mixed-voice recipe
-  did NOT fix recall.** Measured 2026-08-22 on the held-out test features of
-  the fresh run (3,000 positives incl. 1,000 English-phonetic, 2,000
-  negatives): `hej_deda` recall **0.521** at threshold 0.5, false accepts
-  0.0025, accuracy 0.712 — against the previous Serbian-only 0.56. Serbian
-  clips alone reach 0.572, the English-phonetic ones only 0.421, so the extra
-  904 speakers were not the rescue they were meant to be. The scores are
-  **bimodal**: ~45 % of real wake clips score ~0.001, so no threshold rescues
-  them (recall only climbs to 0.612 at threshold 0.02, where false accepts
-  quadruple). Root cause found in the recipe itself, not in the data —
-  `target_false_positives_per_hour: 0.2` with `max_negative_weight: 1500`
-  makes the trainer buy silence with deafness. Retrain queued with the trade
-  shifted (1.0 FP/hr, negative weight 300, layer 96) reusing the same clips.
-  The app therefore still runs the stop-gap: Android's own `SpeechRecognizer`
-  in a restart loop. Wiring any model in (onnxruntime-android) needs a check
-  on real SCO/glasses-mic audio first — do not swap the stop-gap out blind.
+- **Wake-word models retrained and measured 2026-08-22 — usable on clean
+  speech, not yet proven on real glasses audio.** Two numbers per model, and
+  they must never be quoted for each other. CLEAN speech through the
+  streaming pipeline (how the phone actually listens, peak score per clip,
+  n=200): `hej_deda` recall **0.935** at threshold 0.5 (0.925 at 0.7, 0.910
+  at 0.9) with the hand-written near-miss phrases ("hej deko", "ej deda")
+  firing 2.5 % / 2.0 % / 1.5 %; `cao_deda` recall **0.975** at 0.5 (0.955 at
+  0.7) with near-misses firing 0.5 % / 0.0 %. The trainer's own validation
+  set is noise- and reverb-augmented single windows — a stress test — and
+  reads much lower: hej 0.645, cao 0.760. The earlier "the model misses half
+  the wake phrases" reading came from that stress metric alone and was wrong
+  about clean speech; the old model reached 0.810 clean, the retrained one
+  0.935. Recommended starting threshold: **0.7 for hej_deda, 0.5 for
+  cao_deda** — re-decide once real recordings exist. Integration
+  (onnxruntime-android) still waits on a measurement over real SCO/glasses
+  audio; until then the app runs Android's own `SpeechRecognizer` in a
+  restart loop.
+- **The recall/false-accept trade was the root cause, and it is fixed in the
+  configs.** `target_false_positives_per_hour: 0.2` with
+  `max_negative_weight: 1500` bought silence with deafness: the old hej model
+  scored 0.521 on the stress set and 0.810 clean. At 1.0 FP/hr, negative
+  weight 300 and layer_size 96 — same clips, only the trade changed — the
+  same model reads 0.645 stress / 0.935 clean, and the share of augmented
+  clips it scores near zero fell from 45 % to 23 %. The measurement sits in
+  a comment beside the parameters; do not tighten them blind.
 - **Slovenian TTS quality unverified.** Serbian pronunciation was confirmed
   acceptable on-device (2026-08-18, phone test); Slovenian has not had the
   same on-device listening pass yet.

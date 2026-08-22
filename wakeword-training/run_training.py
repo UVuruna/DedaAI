@@ -351,6 +351,40 @@ def train(cfg):
     return ok
 
 
+def clean_stream_scores(onnx, clip_root, limit=200):
+    """Score CLEAN clips the way the phone will: full openWakeWord pipeline,
+    1280-sample chunks, peak score per clip.
+
+    The feature arrays the trainer validates on are noise- and reverb-augmented
+    single windows -- a stress test, not the operating point, and reading them
+    as "the model is deaf" was wrong (2026-08-22: the same model reads 0.645
+    there and 0.960 on clean speech). Both numbers get logged from now on, so
+    nobody has to guess which one a figure came from.
+    """
+    import numpy as np
+    import soundfile as sf
+    from openwakeword.model import Model
+    model = Model(wakeword_models=[onnx], inference_framework='onnx')
+    key = list(model.models.keys())[0]
+
+    def peaks(sub, want_en=None):
+        paths = sorted(os.path.join(clip_root, sub, n)
+                       for n in os.listdir(os.path.join(clip_root, sub))
+                       if n.endswith('.wav')
+                       and (want_en is None or n.startswith('en_') == want_en))
+        out = []
+        for path in paths[:limit]:
+            data, _ = sf.read(path, dtype='int16')
+            model.reset()
+            best = 0.0
+            for i in range(0, max(len(data) - 1280, 1), 1280):
+                best = max(best, float(model.predict(data[i:i + 1280])[key]))
+            out.append(best)
+        return np.array(out) if out else None
+
+    return peaks('positive_test', want_en=False), peaks('negative_test')
+
+
 def evaluate(cfg, thresholds=(0.5, 0.7, 0.9)):
     """Measure the finished .onnx and WRITE THE NUMBER DOWN.
 
@@ -411,8 +445,23 @@ def evaluate(cfg, thresholds=(0.5, 0.7, 0.9)):
     # A model that answers ~0 to a real wake phrase is deaf, not unsure, and no
     # threshold rescues it -- the share of those is the number that told us the
     # recipe, not the data, was wrong (2026-08-22).
-    log('evaluate %s: %.1f%% of real clips score under 0.01 (deaf, not unsure)'
+    log('evaluate %s: %.1f%% of augmented clips score under 0.01 '
+        '(that set is noise + reverb, not clean speech)'
         % (name, 100.0 * float((pos < 0.01).mean())))
+    # The operating point: clean speech through the streaming pipeline, plus
+    # how often the hand-written near-miss phrases ("hej deko", "ej deda")
+    # trigger it. This is the pair that decides a usable threshold.
+    try:
+        clean_pos, clean_neg = clean_stream_scores(onnx, clip_root)
+    except Exception as e:
+        log('evaluate %s: clean-audio pass skipped (%s)' % (name, e))
+        clean_pos = clean_neg = None
+    if clean_pos is not None:
+        for th in thresholds:
+            fired = ('%.3f' % (clean_neg >= th).mean()) if clean_neg is not None else 'n/a'
+            log('evaluate %s: CLEAN streaming, threshold %.2f -> recall %.3f '
+                '(n=%d), near-miss phrases fire %s'
+                % (name, th, float((clean_pos >= th).mean()), len(clean_pos), fired))
     return rows
 
 
