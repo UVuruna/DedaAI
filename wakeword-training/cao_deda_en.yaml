@@ -1,15 +1,22 @@
 # English-phonetic positive generation for "Cao Deda" — same purpose and
 # mechanics as hej_deda_en.yaml (see its header): ~904 libritts_r speakers
 # pronouncing the phrase via respellings, merged into output_cao_deda before
-# augmentation. "ciao" is spelled "chow" — the English TTS reads that right.
+# augmentation. Both spellings ride along: "ciao" (the real loanword, in the
+# voice's dictionary) and "chow" (the bare phonetic fallback).
 
 model_name: "cao_deda_en"
 
 # lang-ok-begin: phonetic respellings ARE the TTS input text
 target_phrase:
+  # English-phonetic respellings of "Ćao Deda" -- what an English voice must
+  # READ to come out sounding Serbian. "ciao" earns its place on the owner's
+  # argument (2026-08-22): it is a real English loanword from Italian, in the
+  # TTS dictionary, and an English speaker says it exactly /tʃaʊ/ -- the same
+  # sound "chow" spells, but from a word the voice has actually seen.
+  - "ciao dedda"
   - "chow dedda"
+  - "ciao deh dah"
   - "chow deh dah"
-  - "chow dead ah"
 
 custom_negative_phrases:
   - "chow down"

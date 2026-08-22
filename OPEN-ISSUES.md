@@ -7,34 +7,42 @@ below fixed. Each line: what is unresolved and what would unblock it.
      leftover-checkout note below — see tests/test_old_name.py ALLOWED. -->
 - **Wake-word models retrained 2026-08-22; on synthetic speech they are
   saturated, so only the stress metric separates them and only real
-  recordings can judge them.** Every figure below comes from
-  `run_training.py --evaluate` and sits in `wakeword-training/training.log`
-  (18:08-18:10). CLEAN speech through openWakeWord's own `predict_clip`
-  (200 held-out clips, peak score per clip): `hej_deda` **1.000** at
-  threshold 0.5 (0.995 at 0.9), the old pre-retune model **0.985**,
-  `cao_deda` **1.000** at every threshold. That measure is useless for
-  ranking models — the test clips come from the same TTS voices the models
-  trained on, so both old and new score ~1.0. The trainer's own validation
-  set (noise + reverb, single window) is where they differ: `hej_deda`
-  0.645 vs the old model's 0.521, `cao_deda` 0.760; the share of those
-  clips a model scores near zero fell from 37.0 % to 23.2 % for hej.
-  Adversarial negatives fire 2.0 % (hej) and 0.0 % (cao) at threshold 0.5 —
-  that set is openWakeWord's auto-generated adversarial texts plus the
-  hand-written Serbian near-misses, which cannot be told apart by filename,
-  so it is NOT a "hej deko fires N %" number. Starting threshold if a model
-  is ever wired in: 0.7 for hej_deda, 0.5 for cao_deda. Integration
-  (onnxruntime-android) still waits on real SCO/glasses audio; the app runs
-  Android's own `SpeechRecognizer` in a restart loop until then.
+  recordings can judge them.** Every figure below is a line in
+  `wakeword-training/training.log` (run of 18:19-18:22), produced by
+  `run_training.py --evaluate`. CLEAN speech through openWakeWord's own
+  `predict_clip` (200 held-out clips per source, peak score per clip),
+  Serbian / English-phonetic:
+
+  | model | 0.5 | 0.7 | 0.9 | adversarial negatives fire (0.5/0.7/0.9) |
+  |---|---|---|---|---|
+  | `hej_deda` | 1.000 / 0.995 | 0.995 / 0.995 | 0.995 / 0.985 | 2.0 % / 2.0 % / 2.0 % |
+  | `hej_deda` pre-retune | 0.985 / 0.970 | 0.985 / 0.955 | 0.960 / 0.890 | 1.0 % / 1.0 % / 0.5 % |
+  | `cao_deda` | 1.000 / 1.000 | 1.000 / 1.000 | 1.000 / 0.980 | 0.0 % |
+
+  That measure cannot rank models — the clips come from the same TTS voices
+  they trained on. The trainer's own validation set (noise + reverb, single
+  window) is where they differ: `hej_deda` 0.645 against the old model's
+  0.521, `cao_deda` 0.760; the share of those clips scored near zero fell
+  from 37.0 % to 23.2 % for hej. The "adversarial negatives" column is the
+  whole `negative_test` set — openWakeWord's auto-generated adversarial
+  texts plus the hand-written Serbian near-misses, which cannot be told
+  apart by filename — so it is NOT a "hej deko fires N %" number. Starting
+  threshold if a model is ever wired in: 0.7 for hej_deda, 0.5 for
+  cao_deda. Integration (onnxruntime-android) still waits on real
+  SCO/glasses audio; until then the app runs Android's own
+  `SpeechRecognizer` in a restart loop.
 - **Two measurement traps already paid for, do not step in them again.**
   (1) A hand-rolled 1280-sample streaming loop reads far lower than
   `predict_clip`, which pads 1 s of silence so short clips fill the model's
-  window — the same baseline model measured 0.810 by hand and 0.985 through
-  the library. Use the library's scorer. (2) Copying an exported `.onnx`
-  under a new name silently loads the WRONG weights: the file references its
+  window. The hand-rolled figures that briefly appeared in this file were
+  never reproducible from committed code and have been struck; only
+  `--evaluate` output belongs here. (2) Copying an exported `.onnx` under a
+  new name silently loads the WRONG weights: the file references its
   external data by the original filename, so a renamed copy picks up
-  whatever `<original>.onnx.data` is on disk. Baselines therefore live in
-  their own directory (`output_hej_deda/baseline_fp02/`) under the original
-  filename, scored with `--evaluate <cfg> --model <path>`.
+  whatever `<original>.onnx.data` is on disk — that is why the first
+  baseline comparison read 0.000. Baselines therefore live in their own
+  directory (`output_hej_deda/baseline_fp02/`) under the original filename
+  and are scored with `--evaluate <cfg> --model <path>`.
 - **The recall/false-accept trade was the root cause and is fixed in the
   configs.** `target_false_positives_per_hour: 0.2` with
   `max_negative_weight: 1500` bought silence with deafness under noise. At

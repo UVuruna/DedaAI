@@ -359,7 +359,8 @@ def clean_stream_scores(onnx, clip_root, limit=200):
     The feature arrays the trainer validates on are noise- and reverb-augmented
     single windows -- a stress test, not the operating point, and reading them
     as "the model is deaf" was wrong (2026-08-22: the same model reads 0.645
-    there and 0.935 on clean speech). Both numbers get logged from now on.
+    there and 1.000 on clean speech through predict_clip). Both numbers get
+    logged from now on.
 
     The negatives here are the WHOLE negative_test set: openWakeWord's
     auto-generated adversarial texts (the bulk) plus the hand-written Serbian
@@ -384,7 +385,9 @@ def clean_stream_scores(onnx, clip_root, limit=200):
             out.append(max((float(f[key]) for f in frames), default=0.0))
         return (np.array(out), len(paths)) if out else (None, len(paths))
 
-    return peaks('positive_test', want_en=False), peaks('negative_test')
+    return {'sr': peaks('positive_test', want_en=False),
+            'en': peaks('positive_test', want_en=True),
+            'neg': peaks('negative_test')}
 
 
 def evaluate(cfg, thresholds=(0.5, 0.7, 0.9), onnx_override=None):
@@ -455,23 +458,28 @@ def evaluate(cfg, thresholds=(0.5, 0.7, 0.9), onnx_override=None):
         % (name, 100.0 * float((pos < 0.01).mean())))
     # The operating point: clean speech through the library's own streaming
     # scorer, beside how often the adversarial negatives trigger it.
-    clean_pos = clean_neg = None
+    clean = None
     try:
-        (clean_pos, n_pos_all), (clean_neg, n_neg_all) = clean_stream_scores(onnx, clip_root)
+        clean = clean_stream_scores(onnx, clip_root)
     except (ImportError, OSError, KeyError, ValueError) as e:
         # Loud on purpose: a run without this number is a run that did not
         # answer the only question it was started for.
         log('evaluate %s: !! CLEAN-AUDIO PASS FAILED (%s: %s) -- this run has '
             'NO operating-point number' % (name, type(e).__name__, e))
-    if clean_pos is not None:
-        log('evaluate %s: clean pass on %d of %d positive and %d of %d '
-            'adversarial-negative clips (first N, alphabetical)'
-            % (name, len(clean_pos), n_pos_all,
-               0 if clean_neg is None else len(clean_neg), n_neg_all))
+    if clean:
+        for src in ('sr', 'en', 'neg'):
+            got, total = clean[src]
+            log('evaluate %s: clean pass on %d of %d %s clips (first N, alphabetical)'
+                % (name, 0 if got is None else len(got), total, src))
+        neg = clean['neg'][0]
         for th in thresholds:
-            fired = ('%.3f' % (clean_neg >= th).mean()) if clean_neg is not None else 'n/a'
-            log('evaluate %s: CLEAN streaming, threshold %.2f -> recall %.3f, '
-                'adversarial negatives fire %s' % (name, th, float((clean_pos >= th).mean()), fired))
+            parts = []
+            for src in ('sr', 'en'):
+                got, _ = clean[src]
+                parts.append('%s %s' % (src, '%.3f' % (got >= th).mean() if got is not None else 'n/a'))
+            fired = ('%.3f' % (neg >= th).mean()) if neg is not None else 'n/a'
+            log('evaluate %s: CLEAN streaming, threshold %.2f -> recall %s, '
+                'adversarial negatives fire %s' % (name, th, ' / '.join(parts), fired))
     return rows
 
 
@@ -483,7 +491,11 @@ def main():
             i = rest.index('--model')         # model's own held-out clips
             override = rest[i + 1]
             rest = rest[:i] + rest[i + 2:]
-        for cfg in rest or ['hej_deda.yaml', 'cao_deda.yaml']:
+        cfgs = rest or ['hej_deda.yaml', 'cao_deda.yaml']
+        if override and len(cfgs) != 1:
+            log('--model scores ONE config (its clips); got %d' % len(cfgs))
+            return 1
+        for cfg in cfgs:
             evaluate(cfg, onnx_override=override)
         return 0
     if '--smoke' in sys.argv:
