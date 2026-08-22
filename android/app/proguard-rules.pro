@@ -34,6 +34,49 @@
 -keep class com.meta.wearable.** { *; }
 -dontwarn com.meta.wearable.**
 
+# ---- JNI: R8 DELETED native methods the .so registers by name -------------
+# Measured from the SHIPPED 0.1.5 build's own mapping output, 2026-08-22.
+# `usage.txt` (R8's list of what it REMOVED) contains 61 native methods,
+# among them:
+#     com.facebook.wearable.airshield.stream.Framing.packNative(...)
+#     androidx.camera.core.ImageProcessingUtil.nativeConvertAndroid420ToBitmap
+# plus every `mHybridData` field of the fbjni hybrid classes.
+#
+# No Java code calls Framing.pack(), so the shrinker dropped it -- but
+# libairshield_light_mbed_jni.so still calls RegisterNatives for it by name.
+# Registration fails, fbjni raises a JniException, building that exception's
+# message throws ClassNotFoundException in a loop, the JNI global reference
+# table overflows at 51200 entries and ART aborts the process:
+#     E Failed to register native method
+#       com.facebook.wearable.airshield.stream.Framing.packNative(
+#       Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;II)I
+#     F Abort message: 'JNI ERROR (app bug): global reference table overflow'
+# That is the "opens once, then closes instantly on every later start" crash.
+#
+# The mechanism is SHRINKING, not obfuscation -- so `-keepclasseswithmember
+# NAMES` is NOT enough (it only blocks renaming, it still allows removal).
+# The rule below must be `-keepclasseswithmembers`, which makes every class
+# holding a native method a shrinking root. It is deliberately global: the
+# CameraX hit above proves this is not a Meta-SDK-only problem.
+-keepclasseswithmembers,includedescriptorclasses class * {
+    native <methods>;
+}
+
+# The SDK's transport layer lives under com.facebook.* (airshield, datax,
+# mediastream, manifest) and drives fbjni HybridData, whose `mHybridData` and
+# `mDestructor` FIELDS are read from C++ by name -- fields the rule above does
+# not cover. Keep the whole surface; it is undocumented and reflection-heavy.
+-keep class com.facebook.** { *; }
+-dontwarn com.facebook.**
+
+# fbjni / Meta infra mark their JNI surface with these annotations.
+-keep @com.facebook.jni.annotations.DoNotStrip class * { *; }
+-keep @com.facebook.proguard.annotations.DoNotStrip class * { *; }
+-keepclassmembers class * {
+    @com.facebook.jni.annotations.DoNotStrip *;
+    @com.facebook.proguard.annotations.DoNotStrip *;
+}
+
 # okhttp/okio reference optional platform integrations (Conscrypt etc.).
 -dontwarn okhttp3.**
 -dontwarn okio.**
