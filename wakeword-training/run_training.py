@@ -317,14 +317,19 @@ def drop_partial_features(clip_root):
         log('%s: removed %d partial feature files (crash leftovers)' % (clip_root, removed))
 
 
-def train(cfg):
+def model_paths(cfg):
+    """cfg -> (conf, name, output dir, clip dir, exported .onnx). Every phase
+    needs the same five, and deriving them twice is how the two copies drift."""
     import yaml
     with open(os.path.join(BASE, cfg), encoding='utf-8') as f:
         conf = yaml.safe_load(f)
     name = conf['model_name']
     outdir = os.path.normpath(os.path.join(BASE, conf['output_dir']))
-    clip_root = os.path.join(outdir, name)
-    onnx = os.path.join(outdir, name + '.onnx')
+    return conf, name, outdir, os.path.join(outdir, name),         os.path.join(outdir, name + '.onnx')
+
+
+def train(cfg):
+    conf, name, outdir, clip_root, onnx = model_paths(cfg)
     if os.path.exists(onnx):
         log('%s: model already trained (%s)' % (cfg, onnx))
         return True
@@ -360,13 +365,7 @@ def evaluate(cfg, thresholds=(0.5, 0.7, 0.9)):
     """
     import numpy as np
     import onnxruntime as ort
-    import yaml
-    with open(os.path.join(BASE, cfg), encoding='utf-8') as f:
-        conf = yaml.safe_load(f)
-    name = conf['model_name']
-    outdir = os.path.normpath(os.path.join(BASE, conf['output_dir']))
-    onnx = os.path.join(outdir, name + '.onnx')
-    clip_root = os.path.join(outdir, name)
+    _, name, _, clip_root, onnx = model_paths(cfg)
     pos_f = os.path.join(clip_root, 'positive_features_test.npy')
     neg_f = os.path.join(clip_root, 'negative_features_test.npy')
     for f in (onnx, pos_f, neg_f):
@@ -387,16 +386,34 @@ def evaluate(cfg, thresholds=(0.5, 0.7, 0.9)):
     pos, neg = scores(pos_f), scores(neg_f)
     log('evaluate %s: %d positive / %d negative held-out clips'
         % (name, len(pos), len(neg)))
-    best = None
+    # Which positives came from the English-phonetic pass: the feature rows are
+    # written in the same glob order the clips sit in, so the `en_` prefix the
+    # merge step gave them still identifies them -- but only while the counts
+    # line up, so the split is skipped rather than guessed if they do not.
+    from pathlib import Path as _Path
+    names = [c.name for c in _Path(os.path.join(clip_root, 'positive_test')).glob('*.wav')]
+    en = np.array([n.startswith('en_') for n in names]) if len(names) == len(pos) else None
+    if en is None:
+        log('evaluate %s: %d clips vs %d feature rows -- no per-source split'
+            % (name, len(names), len(pos)))
+    rows = []
     for th in thresholds:
         recall = float((pos >= th).mean())
         false_accept = float((neg >= th).mean())
         accuracy = float(((pos >= th).sum() + (neg < th).sum()) / (len(pos) + len(neg)))
-        log('evaluate %s: threshold %.2f -> recall %.3f, false accepts %.3f, '
-            'accuracy %.3f' % (name, th, recall, false_accept, accuracy))
-        if best is None:
-            best = (th, recall, false_accept, accuracy)
-    return best
+        split = ''
+        if en is not None and en.any():
+            split = ' (sr %.3f / en %.3f)' % ((pos[~en] >= th).mean(), (pos[en] >= th).mean())
+        log('evaluate %s: threshold %.2f -> recall %.3f%s, false accepts %.3f, '
+            'accuracy %.3f' % (name, th, recall, split, false_accept, accuracy))
+        rows.append({'threshold': th, 'recall': recall,
+                     'false_accepts': false_accept, 'accuracy': accuracy})
+    # A model that answers ~0 to a real wake phrase is deaf, not unsure, and no
+    # threshold rescues it -- the share of those is the number that told us the
+    # recipe, not the data, was wrong (2026-08-22).
+    log('evaluate %s: %.1f%% of real clips score under 0.01 (deaf, not unsure)'
+        % (name, 100.0 * float((pos < 0.01).mean())))
+    return rows
 
 
 def main():
